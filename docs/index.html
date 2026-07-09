@@ -12,12 +12,14 @@
   --n-1: #F7F8F9; --n-2: #E7EAEE; --n-5: #64748B; --n-8: #191D23;
   --surface: #fff; --surface-alt: var(--n-1); --text: var(--n-8);
   --muted: var(--n-5); --border: var(--n-2);
-  --radius: 14px;
-  --shadow: 0 1px 3px rgba(16,42,67,.08), 0 6px 24px rgba(16,42,67,.07);
+  --radius: 16px;
+  --shadow: 0 1px 2px rgba(16,42,67,.04);
+  --border-c: rgba(16,42,67,.09);
 }
 @media (prefers-color-scheme: dark) {
   :root { --surface: var(--bg-9); --surface-alt: var(--bg-10);
-    --text: #fff; --muted: #9FB3C8; --border: var(--bg-8); }
+    --text: #fff; --muted: #9FB3C8; --border: var(--bg-8);
+    --border-c: rgba(233,239,245,.08); --shadow: none; }
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -27,6 +29,7 @@ h1 { font-size: 2.2rem; margin-bottom: 4px; }
 h1 span { color: var(--cyan); }
 .tagline { color: var(--muted); font-size: 1.05rem; margin-bottom: 32px; }
 .card { background: var(--surface); border-radius: var(--radius);
+  border: 1px solid var(--border-c);
   box-shadow: var(--shadow); padding: 24px 28px; margin-bottom: 20px; }
 .card h2 { font-size: 1.1rem; margin-bottom: 10px; }
 .caption { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em;
@@ -34,10 +37,12 @@ h1 span { color: var(--cyan); }
 ul { padding-left: 20px; }
 li { margin-bottom: 6px; }
 .pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
-.pill { padding: 5px 14px; border-radius: 999px; color: #fff;
-  font-size: .78rem; font-weight: 700;
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.45), inset 0 -2px 4px rgba(0,0,0,.15), 0 2px 6px rgba(16,42,67,.25);
-  text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.pill { --c: var(--n-5); padding: 4px 12px; border-radius: 8px;
+  color: var(--c); font-size: .78rem; font-weight: 600;
+  background: color-mix(in srgb, var(--c) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 22%, transparent);
+  display: inline-flex; align-items: center; gap: 7px; }
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
 .note { font-size: .85rem; color: var(--muted); }
 a.btn { display: inline-block; margin-top: 8px; padding: 10px 20px;
@@ -61,11 +66,11 @@ code { background: var(--surface-alt); padding: 2px 7px; border-radius: 6px; fon
     <strong>Risk</strong> (margin of safety, volatility-scaled sizing). Hybrid gate + score: hard
     dealbreakers block, everything else weighs into a 0–100 composite.</p>
     <div class="pills">
-      <span class="pill" style="background:var(--green)">BUY</span>
-      <span class="pill" style="background:var(--orange)">WATCH</span>
-      <span class="pill" style="background:var(--red)">BLOCKED</span>
-      <span class="pill" style="background:var(--purple)">Screening</span>
-      <span class="pill" style="background:var(--cyan)">5-layer composite</span>
+      <span class="pill" style="--c:var(--green)">BUY</span>
+      <span class="pill" style="--c:var(--orange)">WATCH</span>
+      <span class="pill" style="--c:var(--red)">BLOCKED</span>
+      <span class="pill" style="--c:var(--purple)">Screening</span>
+      <span class="pill" style="--c:var(--cyan)">5-layer composite</span>
     </div>
   </div>
 

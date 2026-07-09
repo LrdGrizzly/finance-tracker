@@ -65,7 +65,7 @@ function changeCell(pct) {
 
 function sectorPill(sector) {
   if (!sector) return "";
-  return `<span class="pill" style="background:${sectorColor(sector)}">${sector}</span>`;
+  return `<span class="pill" style="--pill-color:${sectorColor(sector)}">${sector}</span>`;
 }
 
 // ---------- FX ----------
@@ -115,7 +115,7 @@ async function loadTicker(symbolRaw) {
     card.style.display = "";
     const verdictColors = { BUY: "var(--up)", WATCH: "var(--cat-orange)", AVOID: "var(--down)", BLOCKED: "var(--down)" };
     $("#sig-verdict").innerHTML =
-      `<span class="pill signal-pill" style="background:${verdictColors[sig.verdict] || "var(--n-5)"}">${sig.verdict}</span>`;
+      `<span class="pill signal-pill" style="--pill-color:${verdictColors[sig.verdict] || "var(--n-5)"}">${sig.verdict}</span>`;
     const scoreEl = $("#sig-score");
     scoreEl.textContent = `${sig.composite}/100`;
     scoreEl.style.color = verdictColors[sig.verdict] || "var(--text)";
@@ -158,8 +158,8 @@ async function loadTicker(symbolRaw) {
     $("#fit-note").textContent = fit.note;
     $("#fit-table tbody").innerHTML = fit.criteria.map((c) => {
       const verdict = c.passed
-        ? `<span class="pill" style="background:var(--up)">PASS</span>`
-        : `<span class="pill" style="background:var(--down)">MISS</span>`;
+        ? `<span class="pill" style="--pill-color:var(--up)">PASS</span>`
+        : `<span class="pill" style="--pill-color:var(--down)">MISS</span>`;
       return `<tr>
         <td><strong>${c.name}</strong></td>
         <td>${c.threshold}</td>
@@ -425,11 +425,12 @@ async function renderMaintenance() {
     const row = document.createElement("div");
     row.className = "row";
     row.style.padding = "8px 0";
-    row.innerHTML = `<span class="pill" style="background:#64748B">…</span> <span>${c.name}</span>`;
+    row.innerHTML = `<span class="pill" style="--pill-color:#64748B">…</span> <span>${c.name}</span>`;
     el.appendChild(row);
+    const pill = row.querySelector(".pill");
     c.probe()
-      .then(() => { row.querySelector(".pill").style.background = "#0FCA7A"; row.querySelector(".pill").textContent = "OK"; })
-      .catch(() => { row.querySelector(".pill").style.background = "#F75D5F"; row.querySelector(".pill").textContent = "FAIL"; });
+      .then(() => { pill.style.setProperty("--pill-color", "#0FCA7A"); pill.textContent = "OK"; })
+      .catch(() => { pill.style.setProperty("--pill-color", "#F75D5F"); pill.textContent = "FAIL"; });
   }
 }
 
