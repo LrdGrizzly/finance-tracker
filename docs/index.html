@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Tracker — local, free-forever investment dashboard</title>
+<style>
+:root {
+  --cyan: #05C7F2; --green: #0FCA7A; --orange: #F7A23B;
+  --red: #F75D5F; --yellow: #FBC62F; --purple: #695CFB;
+  --bg-1: #F0F4F8; --bg-8: #334E68; --bg-9: #243B53; --bg-10: #102A43;
+  --n-1: #F7F8F9; --n-2: #E7EAEE; --n-5: #64748B; --n-8: #191D23;
+  --surface: #fff; --surface-alt: var(--n-1); --text: var(--n-8);
+  --muted: var(--n-5); --border: var(--n-2);
+  --radius: 14px;
+  --shadow: 0 1px 3px rgba(16,42,67,.08), 0 6px 24px rgba(16,42,67,.07);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --surface: var(--bg-9); --surface-alt: var(--bg-10);
+    --text: #fff; --muted: #9FB3C8; --border: var(--bg-8); }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--surface-alt); color: var(--text); line-height: 1.6; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 48px 24px; }
+h1 { font-size: 2.2rem; margin-bottom: 4px; }
+h1 span { color: var(--cyan); }
+.tagline { color: var(--muted); font-size: 1.05rem; margin-bottom: 32px; }
+.card { background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 24px 28px; margin-bottom: 20px; }
+.card h2 { font-size: 1.1rem; margin-bottom: 10px; }
+.caption { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); margin-bottom: 4px; }
+ul { padding-left: 20px; }
+li { margin-bottom: 6px; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.pill { padding: 5px 14px; border-radius: 999px; color: #fff;
+  font-size: .78rem; font-weight: 700;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.45), inset 0 -2px 4px rgba(0,0,0,.15), 0 2px 6px rgba(16,42,67,.25);
+  text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.note { font-size: .85rem; color: var(--muted); }
+a.btn { display: inline-block; margin-top: 8px; padding: 10px 20px;
+  background: var(--bg-8); color: #fff; text-decoration: none;
+  border-radius: 10px; font-weight: 600; }
+code { background: var(--surface-alt); padding: 2px 7px; border-radius: 6px; font-size: .85em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Finance<span>Tracker</span></h1>
+  <p class="tagline">A local, free-forever investment dashboard for long-term investors. Runs entirely on your own machine — your data never leaves it.</p>
+
+  <div class="card">
+    <div class="caption">What it is</div>
+    <h2>Value investing engine with a technical timing overlay</h2>
+    <p>Five-layer signal architecture: <strong>Secular</strong> (CAPE regime gate) →
+    <strong>Selection</strong> (Graham, Lynch, Magic Formula fundamentals) →
+    <strong>Tactical</strong> (trend regime) → <strong>Timing</strong> (RSI, MACD, Fibonacci confluence) →
+    <strong>Risk</strong> (margin of safety, volatility-scaled sizing). Hybrid gate + score: hard
+    dealbreakers block, everything else weighs into a 0–100 composite.</p>
+    <div class="pills">
+      <span class="pill" style="background:var(--green)">BUY</span>
+      <span class="pill" style="background:var(--orange)">WATCH</span>
+      <span class="pill" style="background:var(--red)">BLOCKED</span>
+      <span class="pill" style="background:var(--purple)">Screening</span>
+      <span class="pill" style="background:var(--cyan)">5-layer composite</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="caption">Features</div>
+    <div class="grid">
+      <div><h2>Ticker Monitor</h2><p class="note">Live quote, 12 value-investing fundamentals, strategy-fit deviation table, 5-layer signal verdict, expandable TradingView chart.</p></div>
+      <div><h2>Screening pipeline</h2><p class="note">Magic Formula dual-rank + Graham filter across S&amp;P 500 + EURO STOXX 50 — surfaces ranked value candidates.</p></div>
+      <div><h2>Portfolio tracking</h2><p class="note">Log purchases with market-price prefill, live P/L per position, EUR totals via ECB daily rates.</p></div>
+      <div><h2>Calculation transparency</h2><p class="note">Every signal expands into how it was computed — formula, data considered, sources, honest caveats.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="caption">Important</div>
+    <h2>This page is a demo — the app itself runs locally</h2>
+    <p>The dashboard needs its Python backend (live market data, screening, caching), so it can't run on GitHub Pages. To use it, clone the repo and run it on your own machine:</p>
+    <p style="margin-top:8px;"><code>git clone https://github.com/LrdGrizzly/finance-tracker.git</code></p>
+    <p>Then follow the README — two commands and it's live at <code>localhost:5001</code>.</p>
+    <a class="btn" href="https://github.com/LrdGrizzly/finance-tracker">View the code on GitHub</a>
+  </div>
+
+  <div class="card">
+    <div class="caption">Principles</div>
+    <ul>
+      <li><strong>Free forever</strong> — every data source is free and keyless: Yahoo Finance, ECB, Shiller/multpl, Wikipedia constituents.</li>
+      <li><strong>Local first</strong> — holdings and watchlist stay in plain JSON on your machine; market cache is disposable SQLite.</li>
+      <li><strong>Long-term</strong> — built for 5+ year horizons, not day trading. BUY ratings are accumulation guidance, not trade triggers.</li>
+      <li><strong>Transparent</strong> — no black box: every score traces to named criteria with thresholds and actual values.</li>
+    </ul>
+  </div>
+
+  <p class="note" style="text-align:center; margin-top:28px;">Personal project. Not investment advice. Data delayed ~15 min (free-tier sources).</p>
+</div>
+</body>
+</html>
