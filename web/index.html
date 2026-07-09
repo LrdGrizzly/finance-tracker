@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Tracker</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
+</head>
+<body>
+
+<header>
+  <h1>Finance<span>Tracker</span></h1>
+  <nav id="tabs">
+    <button data-tab="home" class="active">Home</button>
+    <button data-tab="monitor">Ticker Monitor</button>
+    <button data-tab="suggestions">Suggestions</button>
+    <button data-tab="watchlist">Watchlist</button>
+    <button data-tab="portfolio">Portfolio</button>
+    <button data-tab="heatmaps">Heatmaps</button>
+    <button data-tab="maintenance">Maintenance</button>
+    <button data-tab="learn">Learn</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ============ HOME ============ -->
+  <section id="tab-home" class="tab-panel active">
+    <div class="card">
+      <div class="caption">Overview</div>
+      <h2>Welcome back</h2>
+      <p class="subtitle">Snapshot of everything that matters right now.</p>
+      <div id="home-summary" class="stat-grid"></div>
+    </div>
+    <div class="card">
+      <div class="caption">Watchlist signals</div>
+      <h2>Active signals</h2>
+      <div id="home-signals" class="placeholder">No actionable signals. Signals appear here when the algorithm flags something important.</div>
+    </div>
+  </section>
+
+  <!-- ============ TICKER MONITOR ============ -->
+  <section id="tab-monitor" class="tab-panel">
+    <div class="card">
+      <div class="row">
+        <input id="monitor-input" placeholder="Ticker symbol, e.g. AAPL, ENEL.MI, IWDA.AS" style="flex:1; min-width: 220px;">
+        <button class="btn" id="monitor-load">Analyze</button>
+        <button class="btn ghost" id="monitor-watch">+ Watchlist</button>
+      </div>
+    </div>
+    <div class="card" id="monitor-quote" style="display:none;">
+      <div class="row" style="justify-content: space-between;">
+        <div>
+          <div class="caption" id="mq-meta"></div>
+          <h2 id="mq-name"></h2>
+          <div class="value-display" id="mq-price"></div>
+          <div id="mq-change"></div>
+        </div>
+        <div id="mq-pills"></div>
+      </div>
+      <div class="stat-grid" id="mq-stats"></div>
+    </div>
+    <div class="card" id="monitor-signal" style="display:none;">
+      <div class="row" style="justify-content: space-between;">
+        <div>
+          <div class="caption">Signal engine — 5-layer composite</div>
+          <h2 id="sig-verdict"></h2>
+        </div>
+        <div class="value-display" id="sig-score"></div>
+      </div>
+      <div class="stat-grid" id="sig-layers"></div>
+      <p class="subtitle" id="sig-secular"></p>
+      <details style="margin-top:8px;">
+        <summary style="cursor:pointer; color:var(--text-muted); font-size:0.85rem;">Calculation transparency — how this number was made</summary>
+        <div id="sig-method" style="font-size:0.83rem; color:var(--text-muted); padding-top:8px;"></div>
+      </details>
+    </div>
+    <div class="card" id="monitor-fit" style="display:none;">
+      <div class="row" style="justify-content: space-between;">
+        <div>
+          <div class="caption">Strategy Fit — Selection layer</div>
+          <h2>How far does this skew from your strategy?</h2>
+        </div>
+        <div class="value-display" id="fit-score"></div>
+      </div>
+      <p class="subtitle" id="fit-note"></p>
+      <table id="fit-table">
+        <thead>
+          <tr><th>Criterion</th><th>Threshold</th><th class="num">Actual</th><th>Verdict</th><th>What it means</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card" id="monitor-chart-card" style="display:none;">
+      <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
+        <h2>Interactive chart</h2>
+        <button class="btn ghost" id="chart-expand">Expand chart</button>
+      </div>
+      <div id="tv-chart-container"></div>
+    </div>
+  </section>
+
+  <!-- ============ SUGGESTIONS ============ -->
+  <section id="tab-suggestions" class="tab-panel">
+    <div class="card">
+      <div class="row" style="justify-content: space-between;">
+        <div>
+          <div class="caption">Screening pipeline</div>
+          <h2>System suggestions</h2>
+          <p class="subtitle">Magic Formula rank + Graham filter across S&amp;P 500 + EURO STOXX 50. Run takes ~5 min (rate-limit politeness).</p>
+        </div>
+        <div class="row">
+          <button class="btn" id="screen-start">Run screen</button>
+          <button class="btn ghost" id="screen-refresh">Show results</button>
+        </div>
+      </div>
+      <div id="screen-progress" class="subtitle"></div>
+    </div>
+    <div class="card">
+      <table id="sugg-table">
+        <thead>
+          <tr><th>#</th><th>Ticker</th><th>Name</th><th>Sector</th>
+          <th class="num">Earnings yield</th><th class="num">ROA</th>
+          <th class="num">Graham</th><th class="num">MoS</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="sugg-empty" class="placeholder">No screening results yet. Click "Run screen" — candidates appear as the scan progresses.</div>
+    </div>
+  </section>
+
+  <!-- ============ WATCHLIST ============ -->
+  <section id="tab-watchlist" class="tab-panel">
+    <div class="card">
+      <div class="row">
+        <input id="watch-input" placeholder="Add ticker to watchlist" style="flex:1; min-width: 200px;">
+        <button class="btn" id="watch-add">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      <table id="watch-table">
+        <thead>
+          <tr><th>Ticker</th><th>Name</th><th>Sector</th><th class="num">Price</th><th class="num">Change</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="watch-empty" class="placeholder">Watchlist empty. Add a ticker above.</div>
+    </div>
+  </section>
+
+  <!-- ============ PORTFOLIO ============ -->
+  <section id="tab-portfolio" class="tab-panel">
+    <div class="card">
+      <div class="caption">Log a purchase</div>
+      <div class="row">
+        <input id="h-symbol" placeholder="Ticker" style="width:110px;">
+        <input id="h-date" type="date">
+        <input id="h-price" type="number" step="any" placeholder="Price paid" style="width:120px;">
+        <input id="h-qty" type="number" step="any" placeholder="Quantity" style="width:110px;">
+        <button class="btn" id="h-add">Add position</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="caption">Portfolio</div>
+      <h2 id="pf-total"></h2>
+      <table id="pf-table">
+        <thead>
+          <tr><th>Ticker</th><th>Bought</th><th class="num">Qty</th><th class="num">Paid</th><th class="num">Now</th><th class="num">P/L</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="pf-empty" class="placeholder">No positions logged yet.</div>
+    </div>
+  </section>
+
+  <!-- ============ HEATMAPS ============ -->
+  <section id="tab-heatmaps" class="tab-panel">
+    <div class="card">
+      <div class="caption">Market Pulse</div>
+      <h2>Sector heatmap &amp; breadth</h2>
+      <div class="placeholder">Phase 2 — 11-sector treemap, cap-weight vs equal-weight concentration, advance/decline breadth, choppiness, narrative summary.</div>
+    </div>
+  </section>
+
+  <!-- ============ MAINTENANCE ============ -->
+  <section id="tab-maintenance" class="tab-panel">
+    <div class="card">
+      <div class="caption">System health</div>
+      <h2>Data source checks</h2>
+      <div id="maint-checks"></div>
+    </div>
+  </section>
+
+  <!-- ============ LEARN ============ -->
+  <section id="tab-learn" class="tab-panel">
+    <div class="card">
+      <div class="caption">Academy</div>
+      <h2>Learn investing through the dashboard</h2>
+      <div class="placeholder">Phase 2 — curriculum by layer: house rules, reusable frameworks, chart patterns (cup &amp; handle, Fibonacci), timeframe logic, value + technical integration.</div>
+    </div>
+  </section>
+
+</main>
+
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

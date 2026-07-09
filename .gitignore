@@ -1,0 +1,16 @@
+# environments & caches — rebuildable
+venv/
+cache/
+__pycache__/
+*.pyc
+
+# personal financial data — syncs via Google Drive, not git
+data/
+
+# paid/copyrighted source material — NEVER commit
+Segreti Bancari/
+investment_signal_log.md
+
+# misc
+*.png
+.DS_Store
