@@ -7,7 +7,9 @@ Local, free-forever investment dashboard. Phase 1.
 Open PowerShell and paste:
 
 ```powershell
-cd "C:\Users\A__Mi\projects\finance tracker"
+cd "<path-to-project>\finance tracker"
+python -m venv venv            # first time only
+.\venv\Scripts\python -m pip install flask yfinance   # first time only
 .\venv\Scripts\python app\server.py
 ```
 
