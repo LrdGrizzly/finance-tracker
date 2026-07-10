@@ -96,7 +96,8 @@ def compute_quality(symbol: str) -> dict:
             invested = equity[y] + (total_debt.get(y) or 0) - (cash.get(y) or 0)
         r = _safe_div(nopat, invested)
         if r is not None:
-            roic_series.append({"year": y, "roic": round(r, 4)})
+            roic_series.append({"year": y, "roic": round(r, 4),
+                                "nopat": nopat, "invested": invested})
         g = _safe_div(gross.get(y), revenue.get(y))
         if g is not None:
             gm_series.append({"year": y, "gm": round(g, 4)})
@@ -141,15 +142,33 @@ def compute_quality(symbol: str) -> dict:
         notes.append(f"Operating margin {'expanding' if expanding else 'contracting'}: "
                      f"{round(om_series[-1]['om']*100,1)}% → {round(om_series[0]['om']*100,1)}%")
 
-    # --- reinvestment rate (runway evidence) ---
+    # --- incremental ROIC (peer review: THE compounder test — returns on NEW
+    # capital, not the old base; capex/NI penalized asset-light businesses) ---
     y0 = years[0] if years else None
-    if y0 and net_income.get(y0) and capex.get(y0) is not None:
-        reinvest = _safe_div(abs(capex[y0]), net_income[y0])
-        if reinvest is not None and net_income[y0] > 0:
-            s = 75 if 0.3 <= reinvest <= 1.2 else 50
-            parts.append(("Reinvestment", s, 1.5))
-            notes.append(f"Capex = {round(reinvest*100)}% of net income — "
-                         f"{'meaningful reinvestment, runway being used' if s == 75 else 'low reinvestment (mature/returning cash) or outsized capex'}")
+    if len(roic_series) >= 3:
+        newest, oldest = roic_series[0], roic_series[-1]
+        d_nopat = (newest["nopat"] or 0) - (oldest["nopat"] or 0)
+        d_inv = (newest["invested"] or 0) - (oldest["invested"] or 0)
+        if d_inv > 0:
+            inc_roic = d_nopat / d_inv
+            if inc_roic >= ROIC_TARGET:
+                s = 90
+                note = f"Incremental ROIC {round(inc_roic*100,1)}% — new capital compounds above the 15% bar"
+            elif inc_roic >= 0.08:
+                s = 55
+                note = f"Incremental ROIC {round(inc_roic*100,1)}% — new capital earns less than the base business"
+            else:
+                s = 25
+                note = f"Incremental ROIC {round(inc_roic*100,1)}% — growth capital destroying the return profile"
+            parts.append(("Incremental ROIC", s, 2.5))
+            notes.append(note)
+        elif d_inv < 0 and d_nopat >= 0:
+            parts.append(("Incremental ROIC", 85, 2.5))
+            notes.append("Profit grew while invested capital SHRANK — capital-light compounding + returns to shareholders")
+    if y0 and net_income.get(y0) and capex.get(y0) is not None and net_income[y0] > 0:
+        intensity = _safe_div(abs(capex[y0]), net_income[y0])
+        if intensity is not None:
+            notes.append(f"Capital intensity flag: capex = {round(intensity*100)}% of net income (context, not scored)")
 
     # --- revenue growth (compounding evidence) ---
     rev_years = [y for y in years if revenue.get(y) is not None]
@@ -180,14 +199,36 @@ def compute_quality(symbol: str) -> dict:
                 notes.append(f"Share count grew {round(chg*100,1)}% — dilution working against shareholders")
 
     # --- FCF conversion (earnings quality) ---
-    if y0 and op_cf.get(y0) and capex.get(y0) is not None and net_income.get(y0):
+    fcf = None
+    if y0 and op_cf.get(y0) and capex.get(y0) is not None:
         fcf = op_cf[y0] - abs(capex[y0])
-        conv = _safe_div(fcf, net_income[y0])
-        if conv is not None and net_income[y0] > 0:
+        conv = _safe_div(fcf, net_income.get(y0))
+        if conv is not None and net_income.get(y0) and net_income[y0] > 0:
             s = 80 if conv >= 0.8 else (55 if conv >= 0.5 else 30)
             parts.append(("FCF conversion", s, 1.5))
             notes.append(f"FCF = {round(conv*100)}% of net income — "
                          f"{'earnings are real cash' if s == 80 else 'moderate conversion' if s == 55 else 'earnings not converting to cash — scrutinize accruals'}")
+
+    # --- fair price for a quality business: FCF yield (peer review — the
+    # missing quality-side valuation; Graham math misprices compounders) ---
+    if fcf is not None and fcf > 0:
+        try:
+            import fetcher as _f
+            mcap = _f.get_quote(symbol).get("marketCap")
+        except Exception:
+            mcap = None
+        fy = _safe_div(fcf, mcap)
+        if fy is not None:
+            if fy >= 0.05:
+                s, msg = 85, "FCF yield rich — paying a fair-to-cheap price for the cash flows"
+            elif fy >= 0.03:
+                s, msg = 65, "FCF yield fair — reasonable price for a quality business"
+            elif fy >= 0.015:
+                s, msg = 45, "FCF yield thin — paying up; needs growth to justify"
+            else:
+                s, msg = 25, "FCF yield very thin — priced for perfection"
+            parts.append(("Fair price (FCF yield)", s, 2.0))
+            notes.append(f"FCF yield {round(fy*100,2)}% of market cap — {msg}")
 
     if not parts:
         result = {"score": None, "note": "Insufficient statement data for quality scoring."}

@@ -1,35 +1,37 @@
-/* Finance Tracker — Phase 1 frontend */
+/* Finance Tracker — frontend (TradingView-style layout) */
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
 let FX = { EUR: 1.0 };
 
-// sector -> categorical palette color
 const SECTOR_COLORS = {
   "Technology": "#05C7F2",
-  "Financial Services": "#695CFB",
+  "Financial Services": "#8B7FFC",
   "Healthcare": "#0FCA7A",
   "Consumer Cyclical": "#F7A23B",
   "Consumer Defensive": "#FBC62F",
   "Energy": "#F75D5F",
-  "Industrials": "#627D98",
-  "Basic Materials": "#829AB1",
-  "Communication Services": "#486581",
-  "Utilities": "#334E68",
-  "Real Estate": "#9FB3C8",
+  "Industrials": "#7E93A8",
+  "Basic Materials": "#9FB3C8",
+  "Communication Services": "#5A8DB8",
+  "Utilities": "#6E88A3",
+  "Real Estate": "#B08DCF",
 };
-const sectorColor = (s) => SECTOR_COLORS[s] || "#64748B";
+const sectorColor = (s) => SECTOR_COLORS[s] || "#7E93A8";
+
+const VERDICT_COLORS = {
+  "STRONG BUY": "#0FCA7A", "BUY": "#4ADE9E", "HOLD": "#F7A23B",
+  "SELL": "#F97066", "STRONG SELL": "#F75D5F", "BLOCKED": "#F75D5F",
+};
 
 // ---------- tabs ----------
-$$("#tabs button").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    $$("#tabs button").forEach((b) => b.classList.remove("active"));
-    $$(".tab-panel").forEach((p) => p.classList.remove("active"));
-    btn.classList.add("active");
-    $(`#tab-${btn.dataset.tab}`).classList.add("active");
-  });
-});
+function switchTab(name) {
+  $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  $$(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${name}`));
+}
+$$("#tabs button").forEach((btn) =>
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
 // ---------- helpers ----------
 async function api(path, opts) {
@@ -68,22 +70,63 @@ function sectorPill(sector) {
   return `<span class="pill" style="--pill-color:${sectorColor(sector)}">${sector}</span>`;
 }
 
+// ticker logo: company website favicon, fallback letter avatar
+function logoHTML(q, size = "") {
+  const domain = q.website ? q.website.replace(/^https?:\/\/(www\.)?/, "").split("/")[0] : null;
+  if (domain) {
+    return `<img class="tick-logo ${size}" loading="lazy" alt=""
+      src="https://www.google.com/s2/favicons?domain=${domain}&sz=64"
+      onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'tick-fallback',textContent:'${(q.symbol || "?").slice(0, 2)}',style:'background:${sectorColor(q.sector)}'}))">`;
+  }
+  return `<span class="tick-fallback" style="background:${sectorColor(q.sector)}">${(q.symbol || "?").slice(0, 2)}</span>`;
+}
+
 // ---------- FX ----------
 async function loadFX() {
   try { FX = await api("/api/fx"); } catch (e) { console.warn("FX unavailable:", e); }
 }
 
+// ---------- global search ----------
+$("#global-search").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.value.trim()) {
+    switchTab("monitor");
+    loadTicker(e.target.value.trim());
+    e.target.value = "";
+  }
+});
+
+// ---------- TradingView widgets ----------
+function tvWidget(container, symbol) {
+  $(container).innerHTML = "";
+  new TradingView.widget({
+    container_id: container.slice(1),
+    symbol, autosize: true, interval: "D",
+    theme: window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark",
+    style: "1", locale: "en",
+    hide_side_toolbar: false, allow_symbol_change: true,
+    backgroundColor: "rgba(0,0,0,0)",
+  });
+}
+
 // ---------- Ticker Monitor ----------
-let tvWidget = null;
 let currentSymbol = null;
 
 async function loadTicker(symbolRaw) {
   const symbol = symbolRaw.toUpperCase().trim();
   if (!symbol) return;
   currentSymbol = symbol;
+  $("#monitor-empty").style.display = "none";
+
   const q = await api(`/api/quote/${symbol}`);
 
   $("#monitor-quote").style.display = "";
+  const logoEl = $("#mq-logo");
+  const domain = q.website ? q.website.replace(/^https?:\/\/(www\.)?/, "").split("/")[0] : null;
+  if (domain) {
+    logoEl.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    logoEl.style.display = "";
+  } else logoEl.style.display = "none";
+
   $("#mq-meta").textContent = `${q.exchange || ""} · ${q.quoteType || ""} · ${q.currency || ""}`;
   $("#mq-name").textContent = `${q.symbol} — ${q.name}`;
   $("#mq-price").innerHTML = moneyCell(q.price, q.currency);
@@ -108,52 +151,59 @@ async function loadTicker(symbolRaw) {
     `<div class="stat"><div class="caption">${k}</div><div class="v">${v}</div></div>`
   ).join("");
 
-  // Signal engine — 5-layer composite
+  // Overall signal
   api(`/api/signal/${symbol}`).then((sig) => {
     const card = $("#monitor-signal");
     if (sig.composite === null) { card.style.display = "none"; return; }
     card.style.display = "";
-    const verdictColors = { BUY: "var(--up)", WATCH: "var(--cat-orange)", AVOID: "var(--down)", BLOCKED: "var(--down)" };
-    $("#sig-verdict").innerHTML =
-      `<span class="pill signal-pill" style="--pill-color:${verdictColors[sig.verdict] || "var(--n-5)"}">${sig.verdict}</span>`;
+    const vColor = VERDICT_COLORS[sig.verdict] || "#7E93A8";
+    $("#sig-verdict").innerHTML = `<span class="verdict" style="--v:${vColor}">${sig.verdict}</span>`;
     const scoreEl = $("#sig-score");
     scoreEl.textContent = `${sig.composite}/100`;
-    scoreEl.style.color = verdictColors[sig.verdict] || "var(--text)";
+    scoreEl.style.color = vColor;
+
+    if (sig.strength != null) {
+      $("#sig-strength-wrap").style.display = "";
+      $("#sig-strength-fill").style.width = `${sig.strength}%`;
+      $("#sig-strength-label").textContent = `strength ${sig.strength}/100`;
+    } else $("#sig-strength-wrap").style.display = "none";
 
     $("#sig-layers").innerHTML = Object.entries(sig.layers).map(([name, layer]) => {
       const s = layer.score;
       const w = Math.round((sig.weights[name] || 0) * 100);
-      const notes = (layer.notes || (layer.criteria ? [layer.note] : [])).filter(Boolean);
+      const notes = (layer.notes || []).filter(Boolean);
       return `<div class="stat">
-        <div class="caption">${name} · weight ${w}%</div>
-        <div class="v">${s === null || s === undefined ? "—" : s + "/100"}</div>
-        <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">${notes.slice(0, 3).join("<br>")}</div>
+        <div class="caption">${name} · ${w}%</div>
+        <div class="v">${s == null ? "—" : s + "/100"}</div>
+        <div class="sub">${notes.slice(0, 3).join("<br>")}</div>
       </div>`;
     }).join("");
 
-    $("#sig-secular").textContent = sig.secularCaution
-      ? `⚠ Secular gate: CAPE ${sig.secular.cape} > ${sig.secular.gate} — expensive regime, fresh BUY signals suppressed to WATCH.`
-      : `Secular gate: CAPE ${sig.secular.cape ?? "n/a"} (threshold ${sig.secular.gate}) — regime OK.`;
+    $("#sig-secular").textContent =
+      `Secular context: CAPE ${sig.secular.cape ?? "n/a"} → composite × ${sig.secularMultiplier}` +
+      (sig.secularCaution ? " (expensive regime — graduated haircut applied, position sizing should follow)" : " (no drag)");
 
     const m = sig.methodology;
     $("#sig-method").innerHTML = `
       <strong>Formula:</strong> ${m.compositeFormula}<br>
-      <strong>BUY threshold:</strong> ≥ ${m.buyThreshold} + all gates pass<br>
-      <strong>Data considered:</strong> ${m.historyBars} daily bars, sources: ${m.dataSource}<br>
+      <strong>Verdict ladder:</strong> ${m.verdictLadder}<br>
+      <strong>Selection blend:</strong> ${sig.selectionBlend}<br>
+      <strong>Raw composite before secular:</strong> ${sig.rawComposite}<br>
+      <strong>Data:</strong> ${m.historyBars} daily bars · ${m.dataSource}<br>
       <strong>Hard gates failed:</strong> ${sig.hardGates.length ? sig.hardGates.join("; ") : "none"}<br>
       <strong>Caveats:</strong><br>${m.caveats.map((c) => "· " + c).join("<br>")}`;
   }).catch(() => { $("#monitor-signal").style.display = "none"; });
 
-  // Quality-Compounder score (primary lens)
+  // Quality-Compounder
   api(`/api/quality/${symbol}`).then((ql) => {
     const card = $("#monitor-quality");
-    if (ql.score === null || ql.score === undefined) { card.style.display = "none"; return; }
+    if (ql.score == null) { card.style.display = "none"; return; }
     card.style.display = "";
     const el = $("#q-score");
     el.textContent = `${ql.score}/100`;
     el.style.color = ql.score >= 70 ? "var(--up)" : ql.score >= 45 ? "var(--cat-orange)" : "var(--down)";
     $("#q-components").innerHTML = (ql.components || []).map((c) =>
-      `<div class="stat"><div class="caption">${c.name} · w${c.weight}</div><div class="v">${c.score}/100</div></div>`
+      `<div class="stat"><div class="caption">${c.name}</div><div class="v">${c.score}/100</div></div>`
     ).join("");
     $("#q-notes").innerHTML = (ql.notes || []).map((n) => `<li>${n}</li>`).join("");
     const m = ql.methodology || {};
@@ -163,13 +213,10 @@ async function loadTicker(symbolRaw) {
       <strong>Caveats:</strong><br>${(m.caveats || []).map((c) => "· " + c).join("<br>")}`;
   }).catch(() => { $("#monitor-quality").style.display = "none"; });
 
-  // Deep-Value score (parallel lens)
+  // Deep-Value
   api(`/api/fit/${symbol}`).then((fit) => {
     const card = $("#monitor-fit");
-    if (fit.score === null || !fit.criteria.length) {
-      card.style.display = "none";
-      return;
-    }
+    if (fit.score === null || !fit.criteria.length) { card.style.display = "none"; return; }
     card.style.display = "";
     const scoreEl = $("#fit-score");
     scoreEl.textContent = `${fit.score}/100`;
@@ -184,46 +231,29 @@ async function loadTicker(symbolRaw) {
         <td>${c.threshold}</td>
         <td class="num">${c.actual}</td>
         <td>${verdict}</td>
-        <td style="color:var(--text-muted); font-size:0.82rem;">${c.note}</td>
+        <td class="muted small">${c.note}</td>
       </tr>`;
     }).join("");
   }).catch(() => { $("#monitor-fit").style.display = "none"; });
 
-  // TradingView chart
+  // chart
   $("#monitor-chart-card").style.display = "";
-  $("#tv-chart-container").innerHTML = "";
-  tvWidget = new TradingView.widget({
-    container_id: "tv-chart-container",
-    symbol: symbol,
-    autosize: true,
-    interval: "D",
-    theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
-    style: "1",
-    locale: "en",
-    hide_side_toolbar: false,
-    allow_symbol_change: true,
-    studies: ["MASimple@tv-basicstudies"],
-  });
+  tvWidget("#tv-chart-container", symbol);
 }
 
-$("#monitor-load").addEventListener("click", () => loadTicker($("#monitor-input").value));
-$("#monitor-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") loadTicker($("#monitor-input").value);
-});
 $("#monitor-watch").addEventListener("click", async () => {
-  const sym = ($("#monitor-input").value || currentSymbol || "").toUpperCase().trim();
-  if (!sym) return;
+  if (!currentSymbol) return;
   await api("/api/watchlist", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ symbol: sym }),
+    body: JSON.stringify({ symbol: currentSymbol }),
   });
   renderWatchlist();
 });
 $("#chart-expand").addEventListener("click", () => {
   $("#tv-chart-container").classList.toggle("expanded");
   $("#chart-expand").textContent =
-    $("#tv-chart-container").classList.contains("expanded") ? "Shrink chart" : "Expand chart";
+    $("#tv-chart-container").classList.contains("expanded") ? "Shrink" : "Expand";
 });
 
 // ---------- Watchlist ----------
@@ -232,25 +262,25 @@ async function renderWatchlist() {
   const tbody = $("#watch-table tbody");
   tbody.innerHTML = "";
   $("#watch-empty").style.display = data.tickers.length ? "none" : "";
+  const rail = $("#home-watch-rail");
+  rail.innerHTML = data.tickers.length ? "" : `<div class="placeholder">Empty</div>`;
 
   for (const t of data.tickers) {
     const tr = document.createElement("tr");
     tr.className = "clickable";
-    tr.innerHTML = `<td><strong>${t.symbol}</strong></td><td colspan="4">loading…</td><td></td>`;
-    tr.addEventListener("click", () => {
-      $$("#tabs button").forEach((b) => b.classList.remove("active"));
-      $$(".tab-panel").forEach((p) => p.classList.remove("active"));
-      document.querySelector('[data-tab="monitor"]').classList.add("active");
-      $("#tab-monitor").classList.add("active");
-      $("#monitor-input").value = t.symbol;
-      loadTicker(t.symbol);
-    });
+    tr.innerHTML = `<td><strong>${t.symbol}</strong></td><td colspan="3" class="muted">loading…</td><td></td>`;
+    tr.addEventListener("click", () => { switchTab("monitor"); loadTicker(t.symbol); });
     tbody.appendChild(tr);
+
+    const railItem = document.createElement("div");
+    railItem.className = "rail-item";
+    railItem.innerHTML = `<span class="sym">${t.symbol}</span><span class="px muted">…</span>`;
+    railItem.addEventListener("click", () => { switchTab("monitor"); loadTicker(t.symbol); });
+    rail.appendChild(railItem);
 
     api(`/api/quote/${t.symbol}`).then((q) => {
       tr.innerHTML = `
-        <td><strong>${q.symbol}</strong></td>
-        <td>${q.name}</td>
+        <td><div class="tick-cell">${logoHTML(q)}<div><strong>${q.symbol}</strong><span class="nm">${q.name}</span></div></div></td>
         <td>${sectorPill(q.sector)}</td>
         <td class="num">${moneyCell(q.price, q.currency)}</td>
         <td class="num">${changeCell(q.changePercent)}</td>
@@ -260,9 +290,9 @@ async function renderWatchlist() {
         await api(`/api/watchlist/${q.symbol}`, { method: "DELETE" });
         renderWatchlist();
       });
-    }).catch(() => {
-      tr.children[1].textContent = "failed to load";
-    });
+      railItem.innerHTML = `${logoHTML(q)}<div><div class="sym">${q.symbol}</div><div class="nm">${q.name}</div></div>
+        <div class="px">${fmt(q.price)}<br>${changeCell(q.changePercent)}</div>`;
+    }).catch(() => { tr.children[1].textContent = "failed"; });
   }
   renderHome(data.tickers.length);
 }
@@ -278,9 +308,7 @@ $("#watch-add").addEventListener("click", async () => {
   $("#watch-input").value = "";
   renderWatchlist();
 });
-$("#watch-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("#watch-add").click();
-});
+$("#watch-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#watch-add").click(); });
 
 // ---------- Portfolio ----------
 async function renderPortfolio() {
@@ -309,6 +337,7 @@ async function renderPortfolio() {
       const nowVal = q.price != null ? q.price * p.quantity : null;
       const costVal = p.price * p.quantity;
       const pl = nowVal != null ? ((nowVal - costVal) / costVal) * 100 : null;
+      tr.children[0].innerHTML = `<div class="tick-cell">${logoHTML(q)}<strong>${p.symbol}</strong></div>`;
       tr.children[4].innerHTML = moneyCell(q.price, q.currency);
       tr.children[5].innerHTML = changeCell(pl);
       if (nowVal != null && q.currency && FX[q.currency]) {
@@ -318,15 +347,14 @@ async function renderPortfolio() {
         if (resolved === data.positions.length) {
           const plTot = ((totalNowEUR - totalCostEUR) / totalCostEUR) * 100;
           $("#pf-total").innerHTML =
-            `€${fmt(totalNowEUR)} ${changeCell(plTot)} <span class="subtitle">(cost €${fmt(totalCostEUR)})</span>`;
+            `€${fmt(totalNowEUR)} ${changeCell(plTot)} <span class="muted small">(cost €${fmt(totalCostEUR)})</span>`;
         }
       }
     }).catch(() => { tr.children[4].textContent = "?"; });
   });
 }
 
-// Pre-populate price + date with current market values when ticker entered.
-// Values stay editable — verify or overwrite them to record a past transaction.
+// prefill with current market values — editable for past transactions
 let prefillTimer = null;
 $("#h-symbol").addEventListener("input", () => {
   clearTimeout(prefillTimer);
@@ -335,28 +363,23 @@ $("#h-symbol").addEventListener("input", () => {
   prefillTimer = setTimeout(async () => {
     try {
       const q = await api(`/api/quote/${sym}`);
-      if ($("#h-symbol").value.toUpperCase().trim() !== sym) return; // user kept typing
-      if (!$("#h-date").value) {
-        $("#h-date").value = new Date().toISOString().slice(0, 10);
-      }
+      if ($("#h-symbol").value.toUpperCase().trim() !== sym) return;
+      if (!$("#h-date").value) $("#h-date").value = new Date().toISOString().slice(0, 10);
       if (!$("#h-price").value && q.price != null) {
         $("#h-price").value = q.price;
         $("#h-price").title = `Pre-filled with current market price (${q.currency}). Edit for a past transaction.`;
       }
-    } catch (e) { /* unknown ticker — leave fields alone */ }
+    } catch (e) { /* unknown ticker */ }
   }, 600);
 });
 
 $("#h-add").addEventListener("click", async () => {
   const body = {
-    symbol: $("#h-symbol").value,
-    date: $("#h-date").value,
-    price: $("#h-price").value,
-    quantity: $("#h-qty").value,
+    symbol: $("#h-symbol").value, date: $("#h-date").value,
+    price: $("#h-price").value, quantity: $("#h-qty").value,
   };
   if (!body.symbol || !body.date || !body.price || !body.quantity) {
-    alert("All fields required.");
-    return;
+    alert("All fields required."); return;
   }
   await api("/api/holdings", {
     method: "POST",
@@ -378,7 +401,7 @@ async function pollScreen() {
     if (st.done % 25 === 0) renderSuggestions();
   } else {
     el.textContent = st.finishedAt
-      ? `Last screen finished — ${st.done}/${st.total} processed, ${st.errors} errors.`
+      ? `Last screen: ${st.done}/${st.total} processed, ${st.errors} errors.`
       : "";
     if (screenPoll) { clearInterval(screenPoll); screenPoll = null; }
     renderSuggestions();
@@ -387,14 +410,11 @@ async function pollScreen() {
 
 $("#screen-start").addEventListener("click", async () => {
   await api("/api/screen/start", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
   });
   if (!screenPoll) screenPoll = setInterval(pollScreen, 3000);
   pollScreen();
 });
-
 $("#screen-refresh").addEventListener("click", renderSuggestions);
 
 async function renderSuggestions() {
@@ -403,9 +423,8 @@ async function renderSuggestions() {
   $("#sugg-empty").style.display = rows.length ? "none" : "";
   tbody.innerHTML = rows.map((r, i) => `
     <tr class="clickable" data-sym="${r.symbol}">
-      <td>${i + 1}</td>
-      <td><strong>${r.symbol}</strong></td>
-      <td>${r.name}</td>
+      <td class="muted">${i + 1}</td>
+      <td><div class="tick-cell"><strong>${r.symbol}</strong><span class="nm">${r.name}</span></div></td>
       <td>${sectorPill(r.sector)}</td>
       <td class="num">${r.earningsYield != null ? fmt(r.earningsYield * 100, 1) + "%" : "—"}</td>
       <td class="num">${r.returnOnAssets != null ? fmt(r.returnOnAssets * 100, 1) + "%" : "—"}</td>
@@ -413,23 +432,20 @@ async function renderSuggestions() {
       <td class="num">${r.marginOfSafety != null ? fmt(r.marginOfSafety * 100, 0) + "%" : "—"}</td>
     </tr>`).join("");
   tbody.querySelectorAll("tr").forEach((tr) => {
-    tr.addEventListener("click", () => {
-      document.querySelector('[data-tab="monitor"]').click();
-      $("#monitor-input").value = tr.dataset.sym;
-      loadTicker(tr.dataset.sym);
-    });
+    tr.addEventListener("click", () => { switchTab("monitor"); loadTicker(tr.dataset.sym); });
   });
 }
 
 // ---------- Home ----------
+let homeChartLoaded = false;
+
 async function renderHome(watchCount) {
   const h = await api("/api/holdings");
-  let vixCell = `<div class="stat"><div class="caption">VIX / VVIX</div><div class="v">…</div></div>`;
   $("#home-summary").innerHTML = `
-    <div class="stat"><div class="caption">Watchlist</div><div class="v">${watchCount ?? "…"} tickers</div></div>
-    <div class="stat"><div class="caption">Positions held</div><div class="v">${h.positions.length}</div></div>
-    <div class="stat"><div class="caption">FX rates</div><div class="v">${Object.keys(FX).length} currencies</div></div>
-    <div class="stat" id="home-vix"><div class="caption">VIX / VVIX regime</div><div class="v">…</div></div>`;
+    <div class="stat"><div class="caption">Watchlist</div><div class="v">${watchCount ?? "…"}</div></div>
+    <div class="stat"><div class="caption">Positions</div><div class="v">${h.positions.length}</div></div>
+    <div class="stat"><div class="caption">FX rates</div><div class="v">${Object.keys(FX).length}</div></div>
+    <div class="stat" id="home-vix"><div class="caption">VIX / VVIX</div><div class="v">…</div></div>`;
   try {
     const [vix, vvix] = await Promise.all([api("/api/quote/^VIX"), api("/api/quote/^VVIX")]);
     const v = vix.price, vv = vvix.price;
@@ -438,9 +454,14 @@ async function renderHome(watchCount) {
     $("#home-vix").innerHTML = `
       <div class="caption">VIX / VVIX regime</div>
       <div class="v" style="color:${color}">${fmt(v, 1)} / ${fmt(vv, 1)} · ${regime}</div>
-      <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px;">
-        Volatility regime — position size scales inversely (rule #17)</div>`;
-  } catch (e) { /* index quote unavailable — leave placeholder */ }
+      <div class="sub">Volatility regime — size positions inversely</div>`;
+    $("#top-regime").innerHTML = `VIX <b>${fmt(v, 1)}</b> · <span style="color:${color}">${regime}</span>`;
+  } catch (e) { /* leave placeholder */ }
+
+  if (!homeChartLoaded) {
+    homeChartLoaded = true;
+    tvWidget("#home-chart", "SPY");
+  }
 }
 
 // ---------- Maintenance ----------
@@ -455,7 +476,7 @@ async function renderMaintenance() {
     const row = document.createElement("div");
     row.className = "row";
     row.style.padding = "8px 0";
-    row.innerHTML = `<span class="pill" style="--pill-color:#64748B">…</span> <span>${c.name}</span>`;
+    row.innerHTML = `<span class="pill" style="--pill-color:#7E93A8">…</span> <span>${c.name}</span>`;
     el.appendChild(row);
     const pill = row.querySelector(".pill");
     c.probe()
@@ -472,6 +493,5 @@ async function renderMaintenance() {
   renderMaintenance();
   renderSuggestions().catch(() => {});
   pollScreen().catch(() => {});
-  // quote auto-refresh while app open (cache TTL is 5 min server-side)
   setInterval(() => { renderWatchlist(); renderPortfolio(); }, 5 * 60 * 1000);
 })();

@@ -40,6 +40,7 @@ def get_quote(symbol: str) -> dict:
         "sector": info.get("sector"),
         "industry": info.get("industry"),
         "quoteType": info.get("quoteType"),
+        "website": info.get("website"),
         "exchange": info.get("exchange"),
         "marketCap": info.get("marketCap"),
         # Selection-layer fundamentals (value investing core set)

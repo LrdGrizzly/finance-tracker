@@ -23,7 +23,9 @@ CAPE_TTL = 24 * 3600
 CAPE_GATE = 38.0  # research-backed: 10yr forward real returns poor above this
 MULTPL_URL = "https://www.multpl.com/shiller-pe"
 
-WEIGHTS = {"selection": 0.35, "tactical": 0.20, "timing": 0.20, "risk": 0.25}
+# Peer-review 2026-07-10: Selection dominates for a 5-10yr quality investor;
+# timing/tactical inform entry sizing, not the verdict.
+WEIGHTS = {"selection": 0.50, "tactical": 0.15, "timing": 0.15, "risk": 0.20}
 
 
 # ---------------- SECULAR ----------------
@@ -138,12 +140,18 @@ def score_timing(q, closes):
     price = q.get("price")
     hi, lo = q.get("fiftyTwoWeekHigh"), q.get("fiftyTwoWeekLow")
 
+    # Trend-conditioned RSI (peer review): in a confirmed uptrend RSI lives
+    # at 60-80 for months — punishing >70 blocks the best compounders.
+    ma200 = q.get("twoHundredDayAverage")
+    uptrend = price is not None and ma200 is not None and price > ma200
     r = rsi(closes)
     if r is not None:
         if r < 30:
             parts.append(80); notes.append(f"RSI {r} — oversold (potential accumulation, confirm with trend)")
-        elif r > 70:
-            parts.append(25); notes.append(f"RSI {r} — overbought (chasing strength)")
+        elif r > 70 and not uptrend:
+            parts.append(30); notes.append(f"RSI {r} — overbought without trend support")
+        elif r > 70 and uptrend:
+            parts.append(50); notes.append(f"RSI {r} — hot, but in a confirmed uptrend (trend-conditioned, not a sell signal)")
         else:
             parts.append(55); notes.append(f"RSI {r} — neutral zone")
 
@@ -189,14 +197,15 @@ def score_risk(q, closes):
     if eps and bvps and price and eps > 0 and bvps > 0:
         graham_number = (22.5 * eps * bvps) ** 0.5
         mos = (graham_number - price) / graham_number  # >0 = trading below fair value
+        # Peer review: NO hard gate on Graham number — high-ROIC compounders
+        # carry structurally low book value (buybacks), making GN block exactly
+        # the businesses the philosophy targets. Score input only.
         if mos >= 0.20:
             parts.append(90); notes.append(f"Margin of safety {round(mos*100)}% vs Graham number {round(graham_number,2)} — strong buffer")
         elif mos > 0:
             parts.append(65); notes.append(f"Margin of safety {round(mos*100)}% — thin buffer, below the 20% bar")
         else:
-            parts.append(25); notes.append(f"NEGATIVE margin of safety ({round(mos*100)}%) — price above Graham fair value")
-            if mos < -0.50:
-                gates_failed.append("Price more than 50% above Graham number — hard risk gate")
+            parts.append(35); notes.append(f"Negative Graham margin ({round(mos*100)}%) — note: Graham number understates fair value for buyback-heavy compounders")
 
     de = q.get("debtToEquity")
     if de is not None:
@@ -206,7 +215,9 @@ def score_risk(q, closes):
 
     vol = realized_vol(closes)
     if vol is not None:
-        s = 70 if vol < 25 else (50 if vol < 40 else 30)
+        # Peer review calibration: average single stock runs 25-35% — bands
+        # set for single equities, not index funds.
+        s = 70 if vol < 30 else (50 if vol < 45 else 30)
         parts.append(s)
         notes.append(f"Realized volatility {vol}% annualized — position size should scale inversely (rule #17)")
 
@@ -218,50 +229,96 @@ def score_risk(q, closes):
 
 # ---------------- composite ----------------
 
+def secular_multiplier(cape_value):
+    """Peer review: graduated haircut, NOT a binary gate. CAPE below 32 =
+    no drag; linear taper to 0.80x at CAPE 45+. Never blocks a BUY outright —
+    it shaves conviction and (in practice) position size."""
+    if cape_value is None:
+        return 1.0
+    if cape_value <= 32:
+        return 1.0
+    if cape_value >= 45:
+        return 0.80
+    return round(1.0 - 0.20 * (cape_value - 32) / 13, 3)
+
+
+def verdict_ladder(score):
+    """Overall BUY/SELL verdict with strength, from the secular-adjusted
+    composite. Strength = distance from the nearest boundary, so a 79 BUY
+    reads weaker than an 88 STRONG BUY."""
+    if score is None:
+        return "NO DATA", None
+    if score >= 80:
+        return "STRONG BUY", min(100, round((score - 80) / 20 * 50 + 50))
+    if score >= 65:
+        return "BUY", round((score - 65) / 15 * 45 + 50)
+    if score >= 45:
+        return "HOLD", round((score - 45) / 20 * 45 + 50)
+    if score >= 30:
+        return "SELL", round((45 - score) / 15 * 45 + 50)
+    return "STRONG SELL", min(100, round((30 - score) / 20 * 50 + 50))
+
+
 def full_signal(symbol: str) -> dict:
     q = fetcher.get_quote(symbol)
-    # need eps/bookValue for Graham number — add on demand if missing
     history = fetcher.get_history(symbol, "1y")
     closes = [row["close"] for row in history]
 
     secular = get_cape()
-    selection = strategy.score_selection(q)
+    deep_value = strategy.score_selection(q)
     tactical = score_tactical(q, closes)
     timing = score_timing(q, closes)
     risk = score_risk(q, closes)
 
+    # Selection = quality-compounder primary, deep value secondary
+    # (peer review: quality lens must drive Selection for this philosophy)
+    try:
+        import quality as quality_mod
+        q_score = quality_mod.compute_quality(symbol)
+    except Exception:
+        q_score = {"score": None}
+    qs, dv = q_score.get("score"), deep_value.get("score")
+    if qs is not None and dv is not None:
+        selection_score = round(0.65 * qs + 0.35 * dv)
+        selection_note = f"Blend: 65% quality-compounder ({qs}) + 35% deep-value ({dv})"
+    elif qs is not None:
+        selection_score, selection_note = qs, f"Quality-compounder only ({qs}) — no value data"
+    elif dv is not None:
+        selection_score, selection_note = dv, f"Deep-value only ({dv}) — no statement data for quality"
+    else:
+        selection_score, selection_note = None, "no data"
+
     layers = {
-        "selection": selection.get("score"),
+        "selection": selection_score,
         "tactical": tactical.get("score"),
         "timing": timing.get("score"),
         "risk": risk.get("score"),
     }
 
-    # composite over layers that produced a score, reweighted
     avail = {k: v for k, v in layers.items() if v is not None}
     if avail:
         total_w = sum(WEIGHTS[k] for k in avail)
-        composite = round(sum(v * WEIGHTS[k] for k, v in avail.items()) / total_w)
+        raw_composite = sum(v * WEIGHTS[k] for k, v in avail.items()) / total_w
+        mult = secular_multiplier(secular.get("cape"))
+        composite = round(raw_composite * mult)
     else:
-        composite = None
+        raw_composite, mult, composite = None, 1.0, None
 
     hard_gates = list(risk.get("gatesFailed", []))
     secular_caution = secular.get("caution", False)
 
-    if composite is None:
-        verdict = "NO DATA"
-    elif hard_gates:
-        verdict = "BLOCKED"
-    elif composite >= 70 and not secular_caution:
-        verdict = "BUY"
-    elif composite >= 70 and secular_caution:
-        verdict = "WATCH"  # score clears but secular regime blocks fresh buys
-    elif composite >= 50:
-        verdict = "WATCH"
+    if hard_gates and composite is not None:
+        verdict, strength = "BLOCKED", None
     else:
-        verdict = "AVOID"
+        verdict, strength = verdict_ladder(composite)
 
     return {
+        "rawComposite": round(raw_composite) if raw_composite is not None else None,
+        "secularMultiplier": mult,
+        "strength": strength,
+        "selectionBlend": selection_note,
+        "qualityScore": qs,
+        "deepValueScore": dv,
         "symbol": q["symbol"],
         "name": q.get("name"),
         "sector": q.get("sector"),
@@ -274,14 +331,19 @@ def full_signal(symbol: str) -> dict:
         "secularCaution": secular_caution,
         "hardGates": hard_gates,
         "layers": {
-            "selection": selection,
+            "selection": {"score": selection_score, "notes": [selection_note],
+                          "criteria": deep_value.get("criteria", [])},
             "tactical": tactical,
             "timing": timing,
             "risk": {k: v for k, v in risk.items() if k != "gatesFailed"},
         },
         "methodology": {
-            "compositeFormula": "Selection 35% + Tactical 20% + Timing 20% + Risk 25%, gated by Secular (CAPE) and hard risk gates",
-            "buyThreshold": 70,
+            "compositeFormula": (
+                "Selection 50% (65% quality-compounder + 35% deep-value) + Tactical 15% "
+                "+ Timing 15% + Risk 20%, × secular CAPE multiplier "
+                f"(currently {mult}) — graduated haircut, not a binary gate (peer review 2026-07-10)"
+            ),
+            "verdictLadder": "STRONG BUY ≥80 · BUY ≥65 · HOLD ≥45 · SELL ≥30 · STRONG SELL <30, strength = distance into band",
             "historyBars": len(closes),
             "dataSource": "Yahoo Finance (yfinance), ECB, multpl.com Shiller data",
             "caveats": [

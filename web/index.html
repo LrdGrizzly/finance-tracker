@@ -11,214 +11,251 @@
 </head>
 <body>
 
-<header>
-  <h1>Finance<span>Tracker</span></h1>
-  <nav id="tabs">
-    <button data-tab="home" class="active">Home</button>
-    <button data-tab="monitor">Ticker Monitor</button>
-    <button data-tab="suggestions">Suggestions</button>
-    <button data-tab="watchlist">Watchlist</button>
-    <button data-tab="portfolio">Portfolio</button>
-    <button data-tab="heatmaps">Heatmaps</button>
-    <button data-tab="maintenance">Maintenance</button>
-    <button data-tab="learn">Learn</button>
-  </nav>
-</header>
+<div class="shell">
 
-<main>
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="logo">F<span>T</span></div>
+    <nav id="tabs">
+      <button data-tab="home" class="active" title="Home">
+        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg><span>Home</span>
+      </button>
+      <button data-tab="monitor" title="Ticker Monitor">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><span>Monitor</span>
+      </button>
+      <button data-tab="suggestions" title="Suggestions">
+        <svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.9H21l-5.4 4.2 2 7L12 15.8 6.4 20l2-7L3 8.9h6.6z"/></svg><span>Ideas</span>
+      </button>
+      <button data-tab="watchlist" title="Watchlist">
+        <svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><span>Watchlist</span>
+      </button>
+      <button data-tab="portfolio" title="Portfolio">
+        <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg><span>Portfolio</span>
+      </button>
+      <button data-tab="heatmaps" title="Heatmaps">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg><span>Pulse</span>
+      </button>
+      <button data-tab="maintenance" title="Maintenance">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3h0a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.5h0a1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9v0a1.7 1.7 0 001.5 1h.2a2 2 0 110 4h-.2a1.7 1.7 0 00-1.5 1z"/></svg><span>Health</span>
+      </button>
+      <button data-tab="learn" title="Learn">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 006.5 22H20V2H6.5A2.5 2.5 0 004 4.5z"/></svg><span>Learn</span>
+      </button>
+    </nav>
+  </aside>
 
-  <!-- ============ HOME ============ -->
-  <section id="tab-home" class="tab-panel active">
-    <div class="card">
-      <div class="caption">Overview</div>
-      <h2>Welcome back</h2>
-      <p class="subtitle">Snapshot of everything that matters right now.</p>
-      <div id="home-summary" class="stat-grid"></div>
-    </div>
-    <div class="card">
-      <div class="caption">Watchlist signals</div>
-      <h2>Active signals</h2>
-      <div id="home-signals" class="placeholder">No actionable signals. Signals appear here when the algorithm flags something important.</div>
-    </div>
-  </section>
+  <div class="body-col">
 
-  <!-- ============ TICKER MONITOR ============ -->
-  <section id="tab-monitor" class="tab-panel">
-    <div class="card">
-      <div class="row">
-        <input id="monitor-input" placeholder="Ticker symbol, e.g. AAPL, ENEL.MI, IWDA.AS" style="flex:1; min-width: 220px;">
-        <button class="btn" id="monitor-load">Analyze</button>
-        <button class="btn ghost" id="monitor-watch">+ Watchlist</button>
+    <!-- ============ TOPBAR ============ -->
+    <header class="topbar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="global-search" placeholder="Search ticker — AAPL, ENEL.MI, IWDA.AS…" autocomplete="off">
       </div>
-    </div>
-    <div class="card" id="monitor-quote" style="display:none;">
-      <div class="row" style="justify-content: space-between;">
-        <div>
-          <div class="caption" id="mq-meta"></div>
-          <h2 id="mq-name"></h2>
-          <div class="value-display" id="mq-price"></div>
-          <div id="mq-change"></div>
+      <div id="top-regime" class="regime"></div>
+    </header>
+
+    <main>
+
+      <!-- ============ HOME ============ -->
+      <section id="tab-home" class="tab-panel active">
+        <div id="home-summary" class="stat-strip"></div>
+        <div class="home-grid">
+          <div class="panel chart-panel">
+            <div class="panel-head">
+              <h2 id="home-chart-title">Market chart</h2>
+              <span class="muted" id="home-chart-sym">SPY</span>
+            </div>
+            <div id="home-chart" class="tv-box"></div>
+          </div>
+          <div class="panel rail">
+            <div class="panel-head"><h2>Watchlist</h2></div>
+            <div id="home-watch-rail"></div>
+          </div>
         </div>
-        <div id="mq-pills"></div>
-      </div>
-      <div class="stat-grid" id="mq-stats"></div>
-    </div>
-    <div class="card" id="monitor-signal" style="display:none;">
-      <div class="row" style="justify-content: space-between;">
-        <div>
-          <div class="caption">Signal engine — 5-layer composite</div>
-          <h2 id="sig-verdict"></h2>
+        <div class="panel">
+          <div class="panel-head"><h2>Active signals</h2></div>
+          <div id="home-signals" class="placeholder">No actionable signals yet — appears when the engine flags something.</div>
         </div>
-        <div class="value-display" id="sig-score"></div>
-      </div>
-      <div class="stat-grid" id="sig-layers"></div>
-      <p class="subtitle" id="sig-secular"></p>
-      <details style="margin-top:8px;">
-        <summary style="cursor:pointer; color:var(--text-muted); font-size:0.85rem;">Calculation transparency — how this number was made</summary>
-        <div id="sig-method" style="font-size:0.83rem; color:var(--text-muted); padding-top:8px;"></div>
-      </details>
-    </div>
-    <div class="card" id="monitor-quality" style="display:none;">
-      <div class="row" style="justify-content: space-between;">
-        <div>
-          <div class="caption">Quality-Compounder score — your primary lens</div>
-          <h2>Moat, ROIC, capital allocation</h2>
+      </section>
+
+      <!-- ============ TICKER MONITOR ============ -->
+      <section id="tab-monitor" class="tab-panel">
+        <div class="panel" id="monitor-quote" style="display:none;">
+          <div class="quote-head">
+            <div class="ident">
+              <img id="mq-logo" class="tick-logo lg" alt="" style="display:none;">
+              <div>
+                <div class="muted small" id="mq-meta"></div>
+                <h1 id="mq-name"></h1>
+              </div>
+            </div>
+            <div class="quote-price">
+              <div class="value-display" id="mq-price"></div>
+              <div id="mq-change"></div>
+            </div>
+            <div class="quote-actions">
+              <div id="mq-pills"></div>
+              <button class="btn ghost" id="monitor-watch">+ Watchlist</button>
+            </div>
+          </div>
+          <div class="stat-grid" id="mq-stats"></div>
         </div>
-        <div class="value-display" id="q-score"></div>
-      </div>
-      <div class="stat-grid" id="q-components"></div>
-      <ul id="q-notes" style="margin: 14px 0 0 18px; font-size: 0.85rem; color: var(--text-muted);"></ul>
-      <details style="margin-top:10px;">
-        <summary style="cursor:pointer; color:var(--text-muted); font-size:0.85rem;">Calculation transparency</summary>
-        <div id="q-method" style="font-size:0.83rem; color:var(--text-muted); padding-top:8px;"></div>
-      </details>
-    </div>
-    <div class="card" id="monitor-fit" style="display:none;">
-      <div class="row" style="justify-content: space-between;">
-        <div>
-          <div class="caption">Deep-Value score — parallel lens</div>
-          <h2>Graham / Magic Formula valuation check</h2>
+
+        <div class="panel" id="monitor-signal" style="display:none;">
+          <div class="panel-head">
+            <div>
+              <div class="caption">Overall signal — all criteria combined</div>
+              <div class="verdict-row">
+                <span id="sig-verdict"></span>
+                <div class="strength-wrap" id="sig-strength-wrap" style="display:none;">
+                  <div class="strength-bar"><div id="sig-strength-fill"></div></div>
+                  <span class="muted small" id="sig-strength-label"></span>
+                </div>
+              </div>
+            </div>
+            <div class="value-display" id="sig-score"></div>
+          </div>
+          <div class="stat-grid" id="sig-layers"></div>
+          <p class="muted small" id="sig-secular" style="margin-top:10px;"></p>
+          <details><summary>Calculation transparency — how this number was made</summary>
+            <div id="sig-method" class="method"></div>
+          </details>
         </div>
-        <div class="value-display" id="fit-score"></div>
-      </div>
-      <p class="subtitle" id="fit-note"></p>
-      <table id="fit-table">
-        <thead>
-          <tr><th>Criterion</th><th>Threshold</th><th class="num">Actual</th><th>Verdict</th><th>What it means</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <div class="card" id="monitor-chart-card" style="display:none;">
-      <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
-        <h2>Interactive chart</h2>
-        <button class="btn ghost" id="chart-expand">Expand chart</button>
-      </div>
-      <div id="tv-chart-container"></div>
-    </div>
-  </section>
 
-  <!-- ============ SUGGESTIONS ============ -->
-  <section id="tab-suggestions" class="tab-panel">
-    <div class="card">
-      <div class="row" style="justify-content: space-between;">
-        <div>
-          <div class="caption">Screening pipeline</div>
-          <h2>System suggestions</h2>
-          <p class="subtitle">Magic Formula rank + Graham filter across S&amp;P 500 + EURO STOXX 50. Run takes ~5 min (rate-limit politeness).</p>
+        <div class="panel" id="monitor-quality" style="display:none;">
+          <div class="panel-head">
+            <div>
+              <div class="caption">Quality-Compounder — your primary lens</div>
+              <h2>Moat · ROIC · capital allocation · fair price</h2>
+            </div>
+            <div class="value-display" id="q-score"></div>
+          </div>
+          <div class="stat-grid" id="q-components"></div>
+          <ul id="q-notes" class="notes"></ul>
+          <details><summary>Calculation transparency</summary>
+            <div id="q-method" class="method"></div>
+          </details>
         </div>
-        <div class="row">
-          <button class="btn" id="screen-start">Run screen</button>
-          <button class="btn ghost" id="screen-refresh">Show results</button>
+
+        <div class="panel" id="monitor-fit" style="display:none;">
+          <div class="panel-head">
+            <div>
+              <div class="caption">Deep-Value — parallel lens</div>
+              <h2>Graham / Magic Formula valuation check</h2>
+            </div>
+            <div class="value-display" id="fit-score"></div>
+          </div>
+          <p class="muted small" id="fit-note"></p>
+          <table id="fit-table">
+            <thead><tr><th>Criterion</th><th>Threshold</th><th class="num">Actual</th><th>Verdict</th><th>What it means</th></tr></thead>
+            <tbody></tbody>
+          </table>
         </div>
-      </div>
-      <div id="screen-progress" class="subtitle"></div>
-    </div>
-    <div class="card">
-      <table id="sugg-table">
-        <thead>
-          <tr><th>#</th><th>Ticker</th><th>Name</th><th>Sector</th>
-          <th class="num">Earnings yield</th><th class="num">ROA</th>
-          <th class="num">Graham</th><th class="num">MoS</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div id="sugg-empty" class="placeholder">No screening results yet. Click "Run screen" — candidates appear as the scan progresses.</div>
-    </div>
-  </section>
 
-  <!-- ============ WATCHLIST ============ -->
-  <section id="tab-watchlist" class="tab-panel">
-    <div class="card">
-      <div class="row">
-        <input id="watch-input" placeholder="Add ticker to watchlist" style="flex:1; min-width: 200px;">
-        <button class="btn" id="watch-add">Add</button>
-      </div>
-    </div>
-    <div class="card">
-      <table id="watch-table">
-        <thead>
-          <tr><th>Ticker</th><th>Name</th><th>Sector</th><th class="num">Price</th><th class="num">Change</th><th></th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div id="watch-empty" class="placeholder">Watchlist empty. Add a ticker above.</div>
-    </div>
-  </section>
+        <div class="panel" id="monitor-chart-card" style="display:none;">
+          <div class="panel-head">
+            <h2>Interactive chart</h2>
+            <button class="btn ghost" id="chart-expand">Expand</button>
+          </div>
+          <div id="tv-chart-container" class="tv-box"></div>
+        </div>
 
-  <!-- ============ PORTFOLIO ============ -->
-  <section id="tab-portfolio" class="tab-panel">
-    <div class="card">
-      <div class="caption">Log a purchase</div>
-      <div class="row">
-        <input id="h-symbol" placeholder="Ticker" style="width:110px;">
-        <input id="h-date" type="date">
-        <input id="h-price" type="number" step="any" placeholder="Price paid" style="width:120px;">
-        <input id="h-qty" type="number" step="any" placeholder="Quantity" style="width:110px;">
-        <button class="btn" id="h-add">Add position</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="caption">Portfolio</div>
-      <h2 id="pf-total"></h2>
-      <table id="pf-table">
-        <thead>
-          <tr><th>Ticker</th><th>Bought</th><th class="num">Qty</th><th class="num">Paid</th><th class="num">Now</th><th class="num">P/L</th><th></th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div id="pf-empty" class="placeholder">No positions logged yet.</div>
-    </div>
-  </section>
+        <div class="panel" id="monitor-empty">
+          <div class="placeholder">Search a ticker above to analyze it.</div>
+        </div>
+      </section>
 
-  <!-- ============ HEATMAPS ============ -->
-  <section id="tab-heatmaps" class="tab-panel">
-    <div class="card">
-      <div class="caption">Market Pulse</div>
-      <h2>Sector heatmap &amp; breadth</h2>
-      <div class="placeholder">Phase 2 — 11-sector treemap, cap-weight vs equal-weight concentration, advance/decline breadth, choppiness, narrative summary.</div>
-    </div>
-  </section>
+      <!-- ============ SUGGESTIONS ============ -->
+      <section id="tab-suggestions" class="tab-panel">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>System suggestions</h2>
+              <p class="muted small">Magic Formula rank + Graham filter · S&amp;P 500 + EURO STOXX 50</p>
+            </div>
+            <div class="row">
+              <button class="btn" id="screen-start">Run screen</button>
+              <button class="btn ghost" id="screen-refresh">Refresh</button>
+            </div>
+          </div>
+          <div id="screen-progress" class="muted small"></div>
+          <table id="sugg-table">
+            <thead><tr><th>#</th><th>Ticker</th><th>Sector</th>
+            <th class="num">Earnings yield</th><th class="num">ROA</th>
+            <th class="num">Graham</th><th class="num">MoS</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="sugg-empty" class="placeholder">No results yet — run the screen.</div>
+        </div>
+      </section>
 
-  <!-- ============ MAINTENANCE ============ -->
-  <section id="tab-maintenance" class="tab-panel">
-    <div class="card">
-      <div class="caption">System health</div>
-      <h2>Data source checks</h2>
-      <div id="maint-checks"></div>
-    </div>
-  </section>
+      <!-- ============ WATCHLIST ============ -->
+      <section id="tab-watchlist" class="tab-panel">
+        <div class="panel">
+          <div class="row">
+            <input id="watch-input" placeholder="Add ticker to watchlist" style="flex:1; min-width: 200px;">
+            <button class="btn" id="watch-add">Add</button>
+          </div>
+        </div>
+        <div class="panel">
+          <table id="watch-table">
+            <thead><tr><th>Ticker</th><th>Sector</th><th class="num">Price</th><th class="num">Change</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="watch-empty" class="placeholder">Watchlist empty. Add a ticker above.</div>
+        </div>
+      </section>
 
-  <!-- ============ LEARN ============ -->
-  <section id="tab-learn" class="tab-panel">
-    <div class="card">
-      <div class="caption">Academy</div>
-      <h2>Learn investing through the dashboard</h2>
-      <div class="placeholder">Phase 2 — curriculum by layer: house rules, reusable frameworks, chart patterns (cup &amp; handle, Fibonacci), timeframe logic, value + technical integration.</div>
-    </div>
-  </section>
+      <!-- ============ PORTFOLIO ============ -->
+      <section id="tab-portfolio" class="tab-panel">
+        <div class="panel">
+          <div class="caption">Log a purchase — price &amp; date pre-fill with market values, edit for past transactions</div>
+          <div class="row" style="margin-top:10px;">
+            <input id="h-symbol" placeholder="Ticker" style="width:110px;">
+            <input id="h-date" type="date">
+            <input id="h-price" type="number" step="any" placeholder="Price paid" style="width:130px;">
+            <input id="h-qty" type="number" step="any" placeholder="Quantity" style="width:110px;">
+            <button class="btn" id="h-add">Add position</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2 id="pf-total"></h2></div>
+          <table id="pf-table">
+            <thead><tr><th>Ticker</th><th>Bought</th><th class="num">Qty</th><th class="num">Paid</th><th class="num">Now</th><th class="num">P/L</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="pf-empty" class="placeholder">No positions logged yet.</div>
+        </div>
+      </section>
 
-</main>
+      <!-- ============ HEATMAPS ============ -->
+      <section id="tab-heatmaps" class="tab-panel">
+        <div class="panel">
+          <div class="panel-head"><h2>Market Pulse</h2></div>
+          <div class="placeholder">Phase 3 — sector treemap, cap-weight vs equal-weight concentration, breadth, choppiness, narrative.</div>
+        </div>
+      </section>
+
+      <!-- ============ MAINTENANCE ============ -->
+      <section id="tab-maintenance" class="tab-panel">
+        <div class="panel">
+          <div class="panel-head"><h2>Data source health</h2></div>
+          <div id="maint-checks"></div>
+        </div>
+      </section>
+
+      <!-- ============ LEARN ============ -->
+      <section id="tab-learn" class="tab-panel">
+        <div class="panel">
+          <div class="panel-head"><h2>Learn investing through the dashboard</h2></div>
+          <div class="placeholder">Phase 3 — curriculum by layer: house rules, frameworks, chart patterns, timeframe logic.</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script src="app.js"></script>
