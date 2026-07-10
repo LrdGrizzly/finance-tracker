@@ -504,22 +504,63 @@ async function renderHome(watchCount) {
 
   if (!homeChartLoaded) {
     homeChartLoaded = true;
-    tvWidget("#home-chart", "SP:SPX");
+    loadHomeChart("^GSPC", "S&P 500");
   }
 }
 
-// home chart: index switcher + free symbol search
+// ---------- home chart: our own data + Lightweight Charts (no symbol locks) ----------
+let homeChart = null, homeSeries = null;
+
+async function loadHomeChart(symbol, label) {
+  const el = $("#home-chart");
+  $("#home-chart-label").textContent = label || symbol;
+
+  if (!homeChart) {
+    const css = getComputedStyle(document.documentElement);
+    homeChart = LightweightCharts.createChart(el, {
+      layout: {
+        background: { type: "solid", color: "transparent" },
+        textColor: css.getPropertyValue("--text-muted").trim(),
+        fontFamily: "Inter, sans-serif",
+      },
+      grid: {
+        vertLines: { color: "rgba(133,153,141,0.07)" },
+        horzLines: { color: "rgba(133,153,141,0.07)" },
+      },
+      rightPriceScale: { borderVisible: false },
+      timeScale: { borderVisible: false },
+      crosshair: { mode: 0 },
+      autoSize: true,
+    });
+    homeSeries = homeChart.addCandlestickSeries({
+      upColor: "#0FCA7A", downColor: "#F75D5F",
+      borderUpColor: "#0FCA7A", borderDownColor: "#F75D5F",
+      wickUpColor: "rgba(15,202,122,0.6)", wickDownColor: "rgba(247,93,95,0.6)",
+    });
+  }
+
+  try {
+    const rows = await api(`/api/history/${encodeURIComponent(symbol)}?period=1y`);
+    homeSeries.setData(rows.map((r) => ({
+      time: r.date, open: r.open, high: r.high, low: r.low, close: r.close,
+    })));
+    homeChart.timeScale().fitContent();
+  } catch (e) {
+    $("#home-chart-label").textContent = `${symbol} — no data`;
+  }
+}
+
 $$("#index-chips .chip").forEach((chip) => {
   chip.addEventListener("click", () => {
     $$("#index-chips .chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
-    tvWidget("#home-chart", chip.dataset.tv);
+    loadHomeChart(chip.dataset.sym, chip.textContent);
   });
 });
 $("#home-chart-search").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && e.target.value.trim()) {
     $$("#index-chips .chip").forEach((c) => c.classList.remove("active"));
-    tvWidget("#home-chart", e.target.value.trim().toUpperCase());
+    loadHomeChart(e.target.value.trim().toUpperCase());
     e.target.value = "";
   }
 });

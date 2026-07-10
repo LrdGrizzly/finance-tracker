@@ -65,14 +65,15 @@
           <div class="panel chart-panel">
             <div class="panel-head" style="flex-wrap:wrap;">
               <div class="chip-row" id="index-chips">
-                <button class="chip active" data-tv="AMEX:SPY" title="SPDR S&P 500 ETF">S&amp;P 500</button>
-                <button class="chip" data-tv="NASDAQ:QQQ" title="Invesco Nasdaq 100 ETF">Nasdaq 100</button>
-                <button class="chip" data-tv="MIL:MIB" title="Amundi FTSE MIB UCITS ETF — EUR, exact index replication, Milan-listed">FTSE MIB</button>
-                <button class="chip" data-tv="AMEX:EWU" title="iShares UK ETF">FTSE 100</button>
-                <button class="chip" data-tv="AMEX:EWG" title="iShares Germany ETF">DAX</button>
-                <button class="chip" data-tv="AMEX:EWJ" title="iShares Japan ETF">Nikkei</button>
+                <button class="chip active" data-sym="^GSPC" title="S&P 500 index — real index, Yahoo data">S&amp;P 500</button>
+                <button class="chip" data-sym="^NDX" title="Nasdaq 100 index">Nasdaq 100</button>
+                <button class="chip" data-sym="FTSEMIB.MI" title="FTSE MIB index — EUR, all 40 stocks">FTSE MIB</button>
+                <button class="chip" data-sym="^FTSE" title="FTSE 100 index">FTSE 100</button>
+                <button class="chip" data-sym="^GDAXI" title="DAX index">DAX</button>
+                <button class="chip" data-sym="^N225" title="Nikkei 225 index">Nikkei</button>
               </div>
               <input id="home-chart-search" placeholder="Any symbol…" style="width:130px;">
+              <span class="muted small" id="home-chart-label"></span>
             </div>
             <div id="home-chart" class="tv-box"></div>
           </div>
@@ -266,6 +267,7 @@
 </div>
 
 <script src="https://s3.tradingview.com/tv.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
