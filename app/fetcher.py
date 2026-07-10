@@ -7,6 +7,7 @@ Cache TTLs match how the data actually changes:
 """
 import json
 import time
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
@@ -14,11 +15,40 @@ import yfinance as yf
 
 from db import cache_get, cache_put
 
-QUOTE_TTL = 5 * 60
+QUOTE_TTL = 2 * 60  # near-live while app open; Yahoo free data is ~15min delayed anyway
 HISTORY_TTL = 12 * 3600
 FX_TTL = 12 * 3600
 
 ECB_FX_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+YAHOO_SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search?q={}&quotesCount=8&newsCount=0"
+SEARCH_TTL = 3600
+
+
+def search_symbols(query: str) -> list:
+    """Symbol lookup by name or ticker — Yahoo's free search endpoint."""
+    key = f"__SEARCH_{query.lower().strip()}__"
+    cached = cache_get("quotes", ["symbol"], [key], SEARCH_TTL)
+    if cached:
+        return json.loads(cached)
+
+    url = YAHOO_SEARCH_URL.format(urllib.parse.quote(query))
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    results = [
+        {
+            "symbol": q.get("symbol"),
+            "name": q.get("shortname") or q.get("longname") or "",
+            "exchange": q.get("exchDisp") or q.get("exchange") or "",
+            "type": q.get("quoteType") or "",
+        }
+        for q in data.get("quotes", [])
+        if q.get("symbol") and q.get("quoteType") in ("EQUITY", "ETF", "INDEX", "MUTUALFUND", "CRYPTOCURRENCY")
+    ]
+    cache_put("quotes", ["symbol", "payload", "fetched_at"],
+              [key, json.dumps(results), time.time()])
+    return results
 
 
 def get_quote(symbol: str) -> dict:

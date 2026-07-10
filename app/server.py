@@ -122,6 +122,17 @@ def api_screen_results():
     ))
 
 
+@app.get("/api/search")
+def api_search():
+    q = request.args.get("q", "").strip()
+    if len(q) < 2:
+        return jsonify([])
+    try:
+        return jsonify(fetcher.search_symbols(q))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
 @app.get("/api/fx")
 def api_fx():
     try:

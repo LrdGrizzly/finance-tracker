@@ -86,14 +86,58 @@ async function loadFX() {
   try { FX = await api("/api/fx"); } catch (e) { console.warn("FX unavailable:", e); }
 }
 
-// ---------- global search ----------
-$("#global-search").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && e.target.value.trim()) {
-    switchTab("monitor");
-    loadTicker(e.target.value.trim());
-    e.target.value = "";
-  }
+// ---------- global search with autocomplete (name OR ticker) ----------
+const searchInput = $("#global-search");
+const searchDrop = $("#search-results");
+let searchTimer = null, searchSel = -1, searchItems = [];
+
+function hideSearch() { searchDrop.style.display = "none"; searchSel = -1; }
+
+function pickSearch(item) {
+  hideSearch();
+  searchInput.value = "";
+  switchTab("monitor");
+  loadTicker(item.symbol);
+}
+
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  const q = searchInput.value.trim();
+  if (q.length < 2) { hideSearch(); return; }
+  searchTimer = setTimeout(async () => {
+    try {
+      searchItems = await api(`/api/search?q=${encodeURIComponent(q)}`);
+      if (!searchItems.length) { hideSearch(); return; }
+      searchDrop.innerHTML = searchItems.map((r, i) => `
+        <div class="search-item" data-i="${i}">
+          <span class="sy">${r.symbol}</span>
+          <span class="nm">${r.name}</span>
+          <span class="ex">${r.exchange}</span>
+        </div>`).join("");
+      searchDrop.style.display = "";
+      searchDrop.querySelectorAll(".search-item").forEach((el) =>
+        el.addEventListener("mousedown", (e) => { e.preventDefault(); pickSearch(searchItems[+el.dataset.i]); }));
+    } catch (e) { hideSearch(); }
+  }, 300);
 });
+
+searchInput.addEventListener("keydown", (e) => {
+  const items = searchDrop.querySelectorAll(".search-item");
+  if (e.key === "ArrowDown" && items.length) {
+    e.preventDefault(); searchSel = Math.min(searchSel + 1, items.length - 1);
+  } else if (e.key === "ArrowUp" && items.length) {
+    e.preventDefault(); searchSel = Math.max(searchSel - 1, 0);
+  } else if (e.key === "Enter") {
+    if (searchSel >= 0 && searchItems[searchSel]) pickSearch(searchItems[searchSel]);
+    else if (searchItems.length) pickSearch(searchItems[0]);
+    else if (searchInput.value.trim()) {
+      switchTab("monitor"); loadTicker(searchInput.value.trim()); searchInput.value = ""; hideSearch();
+    }
+    return;
+  } else if (e.key === "Escape") { hideSearch(); return; }
+  items.forEach((el, i) => el.classList.toggle("sel", i === searchSel));
+});
+searchInput.addEventListener("blur", () => setTimeout(hideSearch, 150));
 
 // ---------- TradingView widgets ----------
 function tvWidget(container, symbol) {
@@ -460,9 +504,35 @@ async function renderHome(watchCount) {
 
   if (!homeChartLoaded) {
     homeChartLoaded = true;
-    tvWidget("#home-chart", "SPY");
+    tvWidget("#home-chart", "SP:SPX");
   }
 }
+
+// home chart: index switcher + free symbol search
+$$("#index-chips .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    $$("#index-chips .chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    tvWidget("#home-chart", chip.dataset.tv);
+  });
+});
+$("#home-chart-search").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.value.trim()) {
+    $$("#index-chips .chip").forEach((c) => c.classList.remove("active"));
+    tvWidget("#home-chart", e.target.value.trim().toUpperCase());
+    e.target.value = "";
+  }
+});
+
+// near-live price refresh on the open ticker (every 60s; free data ~15min delayed)
+setInterval(async () => {
+  if (!currentSymbol || !$("#tab-monitor").classList.contains("active")) return;
+  try {
+    const q = await api(`/api/quote/${currentSymbol}`);
+    $("#mq-price").innerHTML = moneyCell(q.price, q.currency);
+    $("#mq-change").innerHTML = changeCell(q.changePercent);
+  } catch (e) { /* transient */ }
+}, 60 * 1000);
 
 // ---------- Maintenance ----------
 async function renderMaintenance() {

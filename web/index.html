@@ -48,9 +48,10 @@
 
     <!-- ============ TOPBAR ============ -->
     <header class="topbar">
-      <div class="search-wrap">
+      <div class="search-wrap" style="position:relative;">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="global-search" placeholder="Search ticker — AAPL, ENEL.MI, IWDA.AS…" autocomplete="off">
+        <input id="global-search" placeholder="Search by name or ticker — Tesla, AAPL, ENEL.MI…" autocomplete="off">
+        <div id="search-results" class="search-dropdown" style="display:none;"></div>
       </div>
       <div id="top-regime" class="regime"></div>
     </header>
@@ -62,9 +63,16 @@
         <div id="home-summary" class="stat-strip"></div>
         <div class="home-grid">
           <div class="panel chart-panel">
-            <div class="panel-head">
-              <h2 id="home-chart-title">Market chart</h2>
-              <span class="muted" id="home-chart-sym">SPY</span>
+            <div class="panel-head" style="flex-wrap:wrap;">
+              <div class="chip-row" id="index-chips">
+                <button class="chip active" data-tv="SP:SPX">S&amp;P 500</button>
+                <button class="chip" data-tv="NASDAQ:NDX">Nasdaq 100</button>
+                <button class="chip" data-tv="MIL:FTSEMIB">FTSE MIB</button>
+                <button class="chip" data-tv="SPREADEX:FTSE">FTSE 100</button>
+                <button class="chip" data-tv="XETR:DAX">DAX</button>
+                <button class="chip" data-tv="TVC:NI225">Nikkei</button>
+              </div>
+              <input id="home-chart-search" placeholder="Any symbol…" style="width:130px;">
             </div>
             <div id="home-chart" class="tv-box"></div>
           </div>
