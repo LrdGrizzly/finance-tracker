@@ -144,7 +144,22 @@ searchInput.addEventListener("keydown", (e) => {
 searchInput.addEventListener("blur", () => setTimeout(hideSearch, 150));
 
 // ---------- TradingView widgets ----------
-function tvWidget(container, symbol) {
+// Yahoo suffix -> TradingView exchange prefix (widget speaks TV symbology)
+const TV_EXCHANGE = {
+  MI: "MIL", L: "LSE", PA: "EURONEXT", AS: "EURONEXT", BR: "EURONEXT",
+  LS: "EURONEXT", DE: "XETR", F: "FWB", SW: "SIX", MC: "BME",
+  TO: "TSX", V: "TSXV", HK: "HKEX", T: "TSE", AX: "ASX",
+  ST: "OMXSTO", OL: "OSL", CO: "OMXCOP", HE: "OMXHEX",
+};
+
+function toTVSymbol(symbol) {
+  const m = symbol.match(/^(.+)\.([A-Z]+)$/);
+  if (m && TV_EXCHANGE[m[2]]) return `${TV_EXCHANGE[m[2]]}:${m[1]}`;
+  return symbol;
+}
+
+function tvWidget(container, symbolRaw) {
+  const symbol = toTVSymbol(symbolRaw);
   $(container).innerHTML = "";
   new TradingView.widget({
     container_id: container.slice(1),
