@@ -576,10 +576,13 @@ async function renderHome(watchCount) {
 
 // ---------- home chart: our own data + Lightweight Charts (no symbol locks) ----------
 let homeChart = null, homeSeries = null;
+let homeSymbol = "^GSPC", homeLabel = "S&P 500", homePeriod = "1y";
 
-async function loadHomeChart(symbol, label) {
+async function loadHomeChart(symbol, label, period) {
+  homeSymbol = symbol; homeLabel = label || symbol;
+  if (period) homePeriod = period;
   const el = $("#home-chart");
-  $("#home-chart-label").textContent = label || symbol;
+  $("#home-chart-label").textContent = `${homeLabel} · ${homePeriod.toUpperCase()}`;
 
   if (!homeChart) {
     const css = getComputedStyle(document.documentElement);
@@ -606,7 +609,7 @@ async function loadHomeChart(symbol, label) {
   }
 
   try {
-    const rows = await api(`/api/history/${encodeURIComponent(symbol)}?period=1y`);
+    const rows = await api(`/api/history/${encodeURIComponent(symbol)}?period=${homePeriod}`);
     homeSeries.setData(rows.map((r) => ({
       time: r.date, open: r.open, high: r.high, low: r.low, close: r.close,
     })));
@@ -629,6 +632,13 @@ $("#home-chart-search").addEventListener("keydown", (e) => {
     loadHomeChart(e.target.value.trim().toUpperCase());
     e.target.value = "";
   }
+});
+$$("#range-chips .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    $$("#range-chips .chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    loadHomeChart(homeSymbol, homeLabel, chip.dataset.period);
+  });
 });
 
 // near-live price refresh on the open ticker (every 60s; free data ~15min delayed)
