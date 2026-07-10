@@ -808,6 +808,53 @@ async function renderMaintenance() {
   }
 }
 
+// ---------- Model Health / backtest ----------
+function renderBacktest(bt) {
+  if (!bt || bt.empty) { $("#mh-empty").style.display = ""; return; }
+  $("#mh-empty").style.display = "none";
+  $("#mh-meta").textContent =
+    `Entry ${bt.entryDate} · run ${bt.runAtHuman} · ${bt.tickersTested} tickers (Segreti Bancari universe) · CAPE at entry ${bt.capeAtEntry}`;
+
+  const hr = bt.overallHitRate;
+  const hrColor = hr >= bt.target ? "var(--up)" : hr >= bt.target - 10 ? "var(--cat-orange)" : "var(--down)";
+  const bench = (bt.benchmarks || []).map((b) => `${b.symbol} ${b.returnPct > 0 ? "+" : ""}${b.returnPct}%`).join(" · ");
+  $("#mh-stats").innerHTML = `
+    <div class="stat"><div class="caption">Overall hit rate</div>
+      <div class="v" style="color:${hrColor}">${hr}%</div>
+      <div class="sub">target ${bt.target}%</div></div>
+    ${bt.bucketStats.map((b) => `
+      <div class="stat"><div class="caption">${b.verdict} (n=${b.count})</div>
+        <div class="v">${b.hitRate}% hit</div>
+        <div class="sub">avg return ${b.avgReturn > 0 ? "+" : ""}${b.avgReturn}%</div></div>`).join("")}
+    <div class="stat"><div class="caption">Benchmarks</div>
+      <div class="v" style="font-size:0.85rem;">${bench}</div>
+      <div class="sub">same window</div></div>`;
+
+  $("#mh-table tbody").innerHTML = bt.results.map((r) => `
+    <tr>
+      <td><strong>${r.symbol}</strong></td>
+      <td><span class="pill" style="--pill-color:${VERDICT_COLORS[r.verdictAtEntry] || "#7E93A8"}">${r.verdictAtEntry}</span></td>
+      <td class="num">${r.compositeAtEntry}</td>
+      <td class="num">${changeCell(r.returnPct)}</td>
+      <td>${r.hit ? '<span class="pill" style="--pill-color:var(--up)">HIT</span>'
+                  : '<span class="pill" style="--pill-color:var(--down)">MISS</span>'}</td>
+    </tr>`).join("");
+  $("#mh-caveats").innerHTML = (bt.caveats || []).map((c) => "· " + c).join("<br>");
+}
+
+$("#mh-run").addEventListener("click", async () => {
+  $("#mh-run").textContent = "Running… (takes a minute)";
+  $("#mh-run").disabled = true;
+  try {
+    const bt = await api("/api/backtest/run", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    });
+    renderBacktest(bt);
+  } catch (e) { alert("Backtest failed: " + e.message); }
+  $("#mh-run").textContent = "Run backtest";
+  $("#mh-run").disabled = false;
+});
+
 // ---------- boot ----------
 (async function boot() {
   await loadFX();
@@ -816,5 +863,6 @@ async function renderMaintenance() {
   renderMaintenance();
   renderSuggestions().catch(() => {});
   pollScreen().catch(() => {});
+  api("/api/backtest/latest").then(renderBacktest).catch(() => {});
   setInterval(() => { renderWatchlist(); renderPortfolio(); }, 5 * 60 * 1000);
 })();

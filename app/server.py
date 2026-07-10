@@ -12,6 +12,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
+import backtest
 import fetcher
 import quality
 import screener
@@ -121,6 +122,24 @@ def api_screen_results():
         min_graham=int(request.args.get("min_graham", 2)),
         top=int(request.args.get("top", 50)),
     ))
+
+
+@app.post("/api/backtest/run")
+def api_backtest_run():
+    body = request.get_json(silent=True) or {}
+    try:
+        return jsonify(backtest.run_backtest(
+            tickers=body.get("tickers"),
+            entry_date=body.get("entryDate", "2025-06-30"),
+        ))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.get("/api/backtest/latest")
+def api_backtest_latest():
+    run = backtest.latest_run()
+    return jsonify(run or {"empty": True})
 
 
 @app.get("/api/search")

@@ -278,6 +278,26 @@
           <div class="panel-head"><h2>Data source health</h2></div>
           <div id="maint-checks"></div>
         </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="caption">Model Health</div>
+              <h2>Backtest calibration — does the engine's verdict predict outcomes?</h2>
+              <p class="muted small" id="mh-meta"></p>
+            </div>
+            <button class="btn" id="mh-run">Run backtest</button>
+          </div>
+          <div class="stat-grid" id="mh-stats"></div>
+          <table id="mh-table" style="margin-top:12px;">
+            <thead><tr><th>Ticker</th><th>Verdict @ entry</th><th class="num">Composite</th>
+            <th class="num">Return</th><th>Outcome</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="mh-empty" class="placeholder">No backtest run yet.</div>
+          <details><summary>Method &amp; caveats</summary>
+            <div id="mh-caveats" class="method"></div>
+          </details>
+        </div>
       </section>
 
       <!-- ============ LEARN ============ -->

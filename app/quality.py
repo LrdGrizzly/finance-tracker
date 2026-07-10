@@ -82,7 +82,36 @@ def compute_quality(symbol: str) -> dict:
     capex = _row(cf, "Capital Expenditure")
     op_cf = _row(cf, "Operating Cash Flow")
 
-    years = _years_desc(ebit, equity)[:4]
+    data_source = "yfinance annual statements (up to 4 years)"
+    max_years = 4
+
+    # US names: extend history via SEC EDGAR (~10-17 years of 10-K XBRL)
+    try:
+        import edgar
+        eh = edgar.get_annual_history(symbol)
+    except Exception:
+        eh = None
+    if eh and len(eh.get("years", [])) >= 6:
+        s = eh["series"]
+        ebit = s.get("ebit") or ebit
+        pretax = s.get("pretax") or pretax
+        tax = s.get("tax") or tax
+        revenue = s.get("revenue") or revenue
+        gross = s.get("gross") or gross
+        net_income = s.get("netincome") or net_income
+        equity = s.get("equity") or equity
+        total_debt = s.get("debt") or total_debt
+        cash = s.get("cash") or cash
+        shares = s.get("shares") or shares
+        # cashflow rows: negative-capex convention matches yfinance usage below
+        if s.get("capex"):
+            capex = {y: -abs(v) for y, v in s["capex"].items() if v is not None}
+        if s.get("opcf"):
+            op_cf = s["opcf"]
+        data_source = "SEC EDGAR 10-K XBRL + yfinance"
+        max_years = 10
+
+    years = _years_desc(ebit, equity)[:max_years]
 
     roic_series, gm_series, om_series = [], [], []
     for y in years:
@@ -243,9 +272,11 @@ def compute_quality(symbol: str) -> dict:
             "yearsCovered": years,
             "methodology": {
                 "roic": "NOPAT (EBIT × (1 − effective tax)) / (equity + total debt − cash)",
-                "source": "yfinance annual statements (up to 4 years)",
+                "source": data_source,
                 "caveats": [
-                    "4-year window — philosophy asks for longer durability than free data shows",
+                    (f"{len(years)}-year window via SEC EDGAR — meets the philosophy's durability bar"
+                     if max_years > 4 else
+                     "4-year window (non-US name, EDGAR unavailable) — shorter than the philosophy's durability bar"),
                     "Statement line-item names vary by company; missing rows skip that component",
                     "Moat is proxied by margin level/stability — qualitative moat judgment stays human",
                 ],
