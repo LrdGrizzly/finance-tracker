@@ -591,6 +591,24 @@ const INTERVAL_PERIODS = {
   "1wk": ["1y", "5y", "10y", "max"],
 };
 
+// fetch window: max free depth per interval, so MAs have full lookback
+// (compute on everything, DISPLAY the requested window — TradingView behavior)
+const FETCH_PERIOD = { "1m": "7d", "15m": "60d", "1h": "2y", "1d": "max", "1wk": "max" };
+
+// requested period → seconds of visible window
+function periodSeconds(p) {
+  const day = 86400;
+  const map = {
+    "1d": day, "5d": 5 * day, "7d": 7 * day, "1mo": 31 * day, "60d": 60 * day,
+    "3mo": 92 * day, "6mo": 183 * day, "1y": 365 * day, "2y": 730 * day,
+    "5y": 5 * 365 * day, "10y": 10 * 365 * day,
+  };
+  if (p === "ytd") {
+    return Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1)) / 1000);
+  }
+  return map[p] || null; // null = max → show everything
+}
+
 function smaLine(rows, period) {
   const out = [];
   let sum = 0;
@@ -655,16 +673,24 @@ async function loadHomeChart(symbol, label, period, interval) {
   }
 
   try {
+    const fetchPeriod = FETCH_PERIOD[homeInterval] || homePeriod;
     const rows = await api(
-      `/api/history/${encodeURIComponent(symbol)}?period=${homePeriod}&interval=${homeInterval}`);
+      `/api/history/${encodeURIComponent(symbol)}?period=${fetchPeriod}&interval=${homeInterval}`);
     homeSeries.setData(rows.map((r) => ({
       time: r.t, open: r.open, high: r.high, low: r.low, close: r.close,
     })));
-    // 50/200-bar MAs of the CURRENT timeframe (TradingView convention);
-    // hidden automatically when the range has too few bars to compute
+    // 50/200-bar MAs computed on FULL fetched history so the lines span
+    // the whole visible window (TradingView behavior), not just its tail
     homeMA50.setData(rows.length > 50 ? smaLine(rows, 50) : []);
     homeMA200.setData(rows.length > 200 ? smaLine(rows, 200) : []);
-    homeChart.timeScale().fitContent();
+    // show only the requested window; pan left to see the rest
+    const secs = periodSeconds(homePeriod);
+    if (secs && rows.length) {
+      const to = rows[rows.length - 1].t;
+      homeChart.timeScale().setVisibleRange({ from: to - secs, to });
+    } else {
+      homeChart.timeScale().fitContent();
+    }
   } catch (e) {
     $("#home-chart-label").textContent = `${symbol} — no data`;
   }
