@@ -14,3 +14,6 @@ investment_signal_log.md
 # misc
 *.png
 .DS_Store
+
+# third-party research PDFs - NEVER commit
+sources/
