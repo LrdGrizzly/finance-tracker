@@ -76,7 +76,16 @@
               <span class="muted small" id="home-chart-label"></span>
             </div>
             <div id="home-chart" class="tv-box"></div>
+            <div class="chip-row" id="interval-chips" style="margin-top:10px;">
+              <button class="chip" data-interval="1m" data-defperiod="1d" title="1-minute bars — Yahoo free limit: last 7 days">1m</button>
+              <button class="chip" data-interval="15m" data-defperiod="5d" title="15-minute bars — last 60 days">15m</button>
+              <button class="chip" data-interval="1h" data-defperiod="1mo" title="Hourly bars — last 2 years">1H</button>
+              <button class="chip active" data-interval="1d" data-defperiod="1y">D</button>
+              <button class="chip" data-interval="1wk" data-defperiod="max">W</button>
+            </div>
             <div class="chip-row" id="range-chips" style="margin-top:10px;">
+              <button class="chip" data-period="1d">1D</button>
+              <button class="chip" data-period="5d">5D</button>
               <button class="chip" data-period="1mo">1M</button>
               <button class="chip" data-period="6mo">6M</button>
               <button class="chip" data-period="ytd">YTD</button>

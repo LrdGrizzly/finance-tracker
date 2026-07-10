@@ -580,7 +580,16 @@ async function renderHome(watchCount) {
 
 // ---------- home chart: our own data + Lightweight Charts (no symbol locks) ----------
 let homeChart = null, homeSeries = null, homeMA50 = null, homeMA200 = null;
-let homeSymbol = "^GSPC", homeLabel = "S&P 500", homePeriod = "1y";
+let homeSymbol = "^GSPC", homeLabel = "S&P 500", homePeriod = "1y", homeInterval = "1d";
+
+// valid period options per interval (Yahoo free limits)
+const INTERVAL_PERIODS = {
+  "1m": ["1d", "5d", "7d"],
+  "15m": ["1d", "5d", "1mo", "60d"],
+  "1h": ["5d", "1mo", "3mo", "6mo", "1y", "2y"],
+  "1d": ["1mo", "6mo", "ytd", "1y", "5y", "10y", "max"],
+  "1wk": ["1y", "5y", "10y", "max"],
+};
 
 function smaLine(rows, period) {
   const out = [];
@@ -588,16 +597,28 @@ function smaLine(rows, period) {
   for (let i = 0; i < rows.length; i++) {
     sum += rows[i].close;
     if (i >= period) sum -= rows[i - period].close;
-    if (i >= period - 1) out.push({ time: rows[i].date, value: sum / period });
+    if (i >= period - 1) out.push({ time: rows[i].t, value: sum / period });
   }
   return out;
 }
 
-async function loadHomeChart(symbol, label, period) {
+async function loadHomeChart(symbol, label, period, interval) {
   homeSymbol = symbol; homeLabel = label || symbol;
+  if (interval) homeInterval = interval;
   if (period) homePeriod = period;
+  // clamp period to what this interval supports
+  const allowed = INTERVAL_PERIODS[homeInterval] || ["1y"];
+  if (!allowed.includes(homePeriod)) homePeriod = allowed[allowed.length - 1];
   const el = $("#home-chart");
-  $("#home-chart-label").textContent = `${homeLabel} · ${homePeriod.toUpperCase()}`;
+  $("#home-chart-label").textContent =
+    `${homeLabel} · ${homeInterval} · ${homePeriod.toUpperCase()}`;
+  // dim unusable range chips for the current interval
+  $$("#range-chips .chip").forEach((c) => {
+    const ok = allowed.includes(c.dataset.period);
+    c.style.opacity = ok ? "" : "0.3";
+    c.style.pointerEvents = ok ? "" : "none";
+    c.classList.toggle("active", c.dataset.period === homePeriod);
+  });
 
   if (!homeChart) {
     const css = getComputedStyle(document.documentElement);
@@ -634,11 +655,13 @@ async function loadHomeChart(symbol, label, period) {
   }
 
   try {
-    const rows = await api(`/api/history/${encodeURIComponent(symbol)}?period=${homePeriod}`);
+    const rows = await api(
+      `/api/history/${encodeURIComponent(symbol)}?period=${homePeriod}&interval=${homeInterval}`);
     homeSeries.setData(rows.map((r) => ({
-      time: r.date, open: r.open, high: r.high, low: r.low, close: r.close,
+      time: r.t, open: r.open, high: r.high, low: r.low, close: r.close,
     })));
-    // 50/200-day moving averages (daily convention — golden/death cross pair)
+    // 50/200-bar MAs of the CURRENT timeframe (TradingView convention);
+    // hidden automatically when the range has too few bars to compute
     homeMA50.setData(rows.length > 50 ? smaLine(rows, 50) : []);
     homeMA200.setData(rows.length > 200 ? smaLine(rows, 200) : []);
     homeChart.timeScale().fitContent();
@@ -666,6 +689,13 @@ $$("#range-chips .chip").forEach((chip) => {
     $$("#range-chips .chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     loadHomeChart(homeSymbol, homeLabel, chip.dataset.period);
+  });
+});
+$$("#interval-chips .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    $$("#interval-chips .chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    loadHomeChart(homeSymbol, homeLabel, chip.dataset.defperiod, chip.dataset.interval);
   });
 });
 

@@ -67,8 +67,9 @@ def api_quote(symbol):
 @app.get("/api/history/<symbol>")
 def api_history(symbol):
     period = request.args.get("period", "1y")
+    interval = request.args.get("interval", "1d")
     try:
-        return jsonify(fetcher.get_history(symbol, period))
+        return jsonify(fetcher.get_history(symbol, period, interval))
     except Exception as e:
         return jsonify({"error": str(e)}), 502
 

@@ -102,30 +102,41 @@ def get_quote(symbol: str) -> dict:
     return payload
 
 
-def get_history(symbol: str, period: str = "1y") -> list:
-    """Daily OHLCV bars as list of dicts."""
+INTRADAY_TTL = 5 * 60
+
+
+def get_history(symbol: str, period: str = "1y", interval: str = "1d") -> list:
+    """OHLCV bars at any yfinance interval (1m…1wk).
+
+    Intraday bars cache for 5 min; daily/weekly for 12h. Each row carries
+    `t` (epoch seconds, chart-ready) and `date` (YYYY-MM-DD, backward compat).
+    """
     symbol = symbol.upper().strip()
-    cached = cache_get("history", ["symbol", "period"], [symbol, period], HISTORY_TTL)
+    key = f"{period}|{interval}"
+    ttl = HISTORY_TTL if interval in ("1d", "1wk", "1mo") else INTRADAY_TTL
+    cached = cache_get("history", ["symbol", "period"], [symbol, key], ttl)
     if cached:
         return json.loads(cached)
 
     t = yf.Ticker(symbol)
-    df = t.history(period=period, auto_adjust=True)
+    df = t.history(period=period, interval=interval, auto_adjust=True)
     rows = [
         {
+            "t": int(idx.timestamp()),
             "date": idx.strftime("%Y-%m-%d"),
             "open": round(float(r["Open"]), 4),
             "high": round(float(r["High"]), 4),
             "low": round(float(r["Low"]), 4),
             "close": round(float(r["Close"]), 4),
-            "volume": int(r["Volume"]),
+            "volume": int(r["Volume"]) if r["Volume"] == r["Volume"] else 0,
         }
         for idx, r in df.iterrows()
+        if r["Open"] == r["Open"]  # skip NaN bars
     ]
     cache_put(
         "history",
         ["symbol", "period", "payload", "fetched_at"],
-        [symbol, period, json.dumps(rows), time.time()],
+        [symbol, key, json.dumps(rows), time.time()],
     )
     return rows
 
