@@ -153,6 +153,10 @@ function tvWidget(container, symbol) {
     style: "1", locale: "en",
     hide_side_toolbar: false, allow_symbol_change: true,
     backgroundColor: "rgba(0,0,0,0)",
+    studies: [
+      { id: "MASimple@tv-basicstudies", inputs: { length: 50 } },
+      { id: "MASimple@tv-basicstudies", inputs: { length: 200 } },
+    ],
   });
 }
 
@@ -575,8 +579,19 @@ async function renderHome(watchCount) {
 }
 
 // ---------- home chart: our own data + Lightweight Charts (no symbol locks) ----------
-let homeChart = null, homeSeries = null;
+let homeChart = null, homeSeries = null, homeMA50 = null, homeMA200 = null;
 let homeSymbol = "^GSPC", homeLabel = "S&P 500", homePeriod = "1y";
+
+function smaLine(rows, period) {
+  const out = [];
+  let sum = 0;
+  for (let i = 0; i < rows.length; i++) {
+    sum += rows[i].close;
+    if (i >= period) sum -= rows[i - period].close;
+    if (i >= period - 1) out.push({ time: rows[i].date, value: sum / period });
+  }
+  return out;
+}
 
 async function loadHomeChart(symbol, label, period) {
   homeSymbol = symbol; homeLabel = label || symbol;
@@ -606,6 +621,16 @@ async function loadHomeChart(symbol, label, period) {
       borderUpColor: "#0FCA7A", borderDownColor: "#F75D5F",
       wickUpColor: "rgba(15,202,122,0.6)", wickDownColor: "rgba(247,93,95,0.6)",
     });
+    homeMA50 = homeChart.addLineSeries({
+      color: "#C77D17", lineWidth: 1, priceLineVisible: false,
+      lastValueVisible: false, crosshairMarkerVisible: false,
+      title: "SMA 50",
+    });
+    homeMA200 = homeChart.addLineSeries({
+      color: "#695CFB", lineWidth: 1, priceLineVisible: false,
+      lastValueVisible: false, crosshairMarkerVisible: false,
+      title: "SMA 200",
+    });
   }
 
   try {
@@ -613,6 +638,9 @@ async function loadHomeChart(symbol, label, period) {
     homeSeries.setData(rows.map((r) => ({
       time: r.date, open: r.open, high: r.high, low: r.low, close: r.close,
     })));
+    // 50/200-day moving averages (daily convention — golden/death cross pair)
+    homeMA50.setData(rows.length > 50 ? smaLine(rows, 50) : []);
+    homeMA200.setData(rows.length > 200 ? smaLine(rows, 200) : []);
     homeChart.timeScale().fitContent();
   } catch (e) {
     $("#home-chart-label").textContent = `${symbol} — no data`;
