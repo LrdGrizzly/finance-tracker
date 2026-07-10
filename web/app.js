@@ -107,7 +107,11 @@ searchInput.addEventListener("input", () => {
   searchTimer = setTimeout(async () => {
     try {
       searchItems = await api(`/api/search?q=${encodeURIComponent(q)}`);
-      if (!searchItems.length) { hideSearch(); return; }
+      if (!searchItems.length) {
+        searchDrop.innerHTML = `<div class="search-noresult">No ticker found for “${q}” — check spelling, or try the exchange suffix (e.g. .MI for Milan, .L for London).</div>`;
+        searchDrop.style.display = "";
+        return;
+      }
       searchDrop.innerHTML = searchItems.map((r, i) => `
         <div class="search-item" data-i="${i}">
           <span class="sy">${r.symbol}</span>
@@ -152,6 +156,42 @@ function tvWidget(container, symbol) {
   });
 }
 
+// ---------- analyze progress bar ----------
+const AP_STEPS = 5; // quote, signal, quality, deep-value, chart
+let apDone = 0, apTrickle = null, apTarget = 0, apShown = 0;
+
+function apStart(symbol) {
+  apDone = 0; apTarget = 8; apShown = 0;
+  $("#analyze-progress").style.display = "";
+  $("#ap-label").textContent = `Analyzing ${symbol} — running the algorithm on its data…`;
+  $("#ap-fill").style.width = "0%";
+  $("#ap-pct").textContent = "0%";
+  clearInterval(apTrickle);
+  // smooth trickle toward the current target so the bar never sits frozen
+  apTrickle = setInterval(() => {
+    if (apShown < apTarget) {
+      apShown = Math.min(apTarget, apShown + 1);
+      $("#ap-fill").style.width = apShown + "%";
+      $("#ap-pct").textContent = apShown + "%";
+    }
+  }, 60);
+}
+
+function apStep(stageLabel) {
+  apDone++;
+  apTarget = Math.min(96, Math.round((apDone / AP_STEPS) * 100));
+  if (stageLabel) $("#ap-label").textContent = stageLabel;
+  if (apDone >= AP_STEPS) {
+    apTarget = 100;
+    setTimeout(() => {
+      clearInterval(apTrickle);
+      $("#ap-fill").style.width = "100%";
+      $("#ap-pct").textContent = "100%";
+      setTimeout(() => { $("#analyze-progress").style.display = "none"; }, 450);
+    }, 250);
+  }
+}
+
 // ---------- Ticker Monitor ----------
 let currentSymbol = null;
 
@@ -160,8 +200,30 @@ async function loadTicker(symbolRaw) {
   if (!symbol) return;
   currentSymbol = symbol;
   $("#monitor-empty").style.display = "none";
+  apStart(symbol);
 
-  const q = await api(`/api/quote/${symbol}`);
+  let q;
+  try {
+    q = await api(`/api/quote/${symbol}`);
+  } catch (e) {
+    clearInterval(apTrickle);
+    $("#analyze-progress").style.display = "none";
+    $("#monitor-empty").style.display = "";
+    $("#monitor-empty").querySelector(".placeholder").textContent =
+      `“${symbol}” returned no data — it may not be a valid ticker. Use the search bar to find the right symbol.`;
+    ["#monitor-quote", "#monitor-signal", "#monitor-quality", "#monitor-fit", "#monitor-chart-card"]
+      .forEach((s) => { $(s).style.display = "none"; });
+    return;
+  }
+  if (q.price == null) {
+    clearInterval(apTrickle);
+    $("#analyze-progress").style.display = "none";
+    $("#monitor-empty").style.display = "";
+    $("#monitor-empty").querySelector(".placeholder").textContent =
+      `“${symbol}” exists but has no market data — probably not a tradeable ticker. Try the search bar.`;
+    return;
+  }
+  apStep(`Quote loaded — scoring ${symbol} against your criteria…`);
 
   $("#monitor-quote").style.display = "";
   const logoEl = $("#mq-logo");
@@ -197,6 +259,7 @@ async function loadTicker(symbolRaw) {
 
   // Overall signal
   api(`/api/signal/${symbol}`).then((sig) => {
+    apStep("Signal engine done — computing quality score…");
     const card = $("#monitor-signal");
     if (sig.composite === null) { card.style.display = "none"; return; }
     card.style.display = "";
@@ -236,10 +299,11 @@ async function loadTicker(symbolRaw) {
       <strong>Data:</strong> ${m.historyBars} daily bars · ${m.dataSource}<br>
       <strong>Hard gates failed:</strong> ${sig.hardGates.length ? sig.hardGates.join("; ") : "none"}<br>
       <strong>Caveats:</strong><br>${m.caveats.map((c) => "· " + c).join("<br>")}`;
-  }).catch(() => { $("#monitor-signal").style.display = "none"; });
+  }).catch(() => { apStep(); $("#monitor-signal").style.display = "none"; });
 
   // Quality-Compounder
   api(`/api/quality/${symbol}`).then((ql) => {
+    apStep("Quality-compounder scored — checking deep value…");
     const card = $("#monitor-quality");
     if (ql.score == null) { card.style.display = "none"; return; }
     card.style.display = "";
@@ -255,10 +319,11 @@ async function loadTicker(symbolRaw) {
       <strong>ROIC formula:</strong> ${m.roic || ""}<br>
       <strong>Source:</strong> ${m.source || ""} — years: ${(ql.yearsCovered || []).join(", ")}<br>
       <strong>Caveats:</strong><br>${(m.caveats || []).map((c) => "· " + c).join("<br>")}`;
-  }).catch(() => { $("#monitor-quality").style.display = "none"; });
+  }).catch(() => { apStep(); $("#monitor-quality").style.display = "none"; });
 
   // Deep-Value
   api(`/api/fit/${symbol}`).then((fit) => {
+    apStep("Deep-value checked — loading chart…");
     const card = $("#monitor-fit");
     if (fit.score === null || !fit.criteria.length) { card.style.display = "none"; return; }
     card.style.display = "";
@@ -278,11 +343,12 @@ async function loadTicker(symbolRaw) {
         <td class="muted small">${c.note}</td>
       </tr>`;
     }).join("");
-  }).catch(() => { $("#monitor-fit").style.display = "none"; });
+  }).catch(() => { apStep(); $("#monitor-fit").style.display = "none"; });
 
   // chart
   $("#monitor-chart-card").style.display = "";
   tvWidget("#tv-chart-container", symbol);
+  apStep();
 }
 
 $("#monitor-watch").addEventListener("click", async () => {
