@@ -618,6 +618,19 @@ function periodSeconds(p) {
   return map[p] || null; // null = max → show everything
 }
 
+let latestMA50 = null, latestMA200 = null;
+
+function maLegendHTML(v50, v200) {
+  const f = (v) => (v == null ? "—" : Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }));
+  return `<span style="color:#2E7CF6">● SMA 50: <b>${f(v50)}</b></span>
+          <span style="color:#E5484D; margin-left:14px;">● SMA 200: <b>${f(v200)}</b></span>`;
+}
+
+function updateMALegendLatest() {
+  const legend = $("#home-ma-legend");
+  if (legend) legend.innerHTML = maLegendHTML(latestMA50, latestMA200);
+}
+
 function smaLine(rows, period) {
   const out = [];
   let sum = 0;
@@ -672,13 +685,22 @@ async function loadHomeChart(symbol, label, period, interval) {
     // public-analysis convention: 50MA blue, 200MA red
     homeMA50 = homeChart.addLineSeries({
       color: "#2E7CF6", lineWidth: 2, priceLineVisible: false,
-      lastValueVisible: false, crosshairMarkerVisible: false,
+      lastValueVisible: true, crosshairMarkerVisible: true,
       title: "SMA 50",
     });
     homeMA200 = homeChart.addLineSeries({
       color: "#E5484D", lineWidth: 2, priceLineVisible: false,
-      lastValueVisible: false, crosshairMarkerVisible: false,
+      lastValueVisible: true, crosshairMarkerVisible: true,
       title: "SMA 200",
+    });
+    // live legend: follows crosshair, shows latest values at rest
+    homeChart.subscribeCrosshairMove((param) => {
+      const legend = $("#home-ma-legend");
+      if (!legend) return;
+      let v50 = param.seriesData && param.seriesData.get(homeMA50);
+      let v200 = param.seriesData && param.seriesData.get(homeMA200);
+      if (v50 == null && v200 == null) { updateMALegendLatest(); return; }
+      legend.innerHTML = maLegendHTML(v50 && v50.value, v200 && v200.value);
     });
   }
 
@@ -691,8 +713,13 @@ async function loadHomeChart(symbol, label, period, interval) {
     })));
     // 50/200-bar MAs computed on FULL fetched history so the lines span
     // the whole visible window (TradingView behavior), not just its tail
-    homeMA50.setData(rows.length > 50 ? smaLine(rows, 50) : []);
-    homeMA200.setData(rows.length > 200 ? smaLine(rows, 200) : []);
+    const ma50data = rows.length > 50 ? smaLine(rows, 50) : [];
+    const ma200data = rows.length > 200 ? smaLine(rows, 200) : [];
+    homeMA50.setData(ma50data);
+    homeMA200.setData(ma200data);
+    latestMA50 = ma50data.length ? ma50data[ma50data.length - 1].value : null;
+    latestMA200 = ma200data.length ? ma200data[ma200data.length - 1].value : null;
+    updateMALegendLatest();
     // show only the requested window; pan left to see the rest
     const secs = periodSeconds(homePeriod);
     if (secs && rows.length) {
