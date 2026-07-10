@@ -115,7 +115,22 @@ main { max-width: 1160px; margin: 0 auto; padding: 28px 24px 64px; }
   box-shadow: var(--shadow);
   padding: 22px 24px;
   margin-bottom: 18px;
+  position: relative;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
+/* 2.5D: subtle top light-edge + lift on hover */
+.card::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 1px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cat-cyan) 35%, transparent), transparent);
+  opacity: 0; transition: opacity .18s ease;
+}
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-pop);
+  border-color: var(--border-strong);
+}
+.card:hover::before { opacity: 1; }
 .card h2 { font-size: 1.02rem; font-weight: 650; letter-spacing: -0.015em; margin-bottom: 4px; }
 .card .caption {
   font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
@@ -125,6 +140,12 @@ main { max-width: 1160px; margin: 0 auto; padding: 28px 24px 64px; }
 .value-display {
   font-size: 2rem; font-weight: 700; letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, var(--text), color-mix(in srgb, var(--text) 65%, transparent));
+  -webkit-background-clip: text; background-clip: text;
+}
+/* score displays keep their own semantic colors */
+#fit-score, #sig-score, #q-score {
+  background: none; -webkit-background-clip: unset; background-clip: unset;
 }
 
 /* ---------- pills / chips (soft-tinted, modern) ---------- */

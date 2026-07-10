@@ -13,6 +13,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 
 import fetcher
+import quality
 import screener
 import signals
 import strategy
@@ -77,6 +78,14 @@ def api_fit(symbol):
     try:
         q = fetcher.get_quote(symbol)
         return jsonify(strategy.score_selection(q))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.get("/api/quality/<symbol>")
+def api_quality(symbol):
+    try:
+        return jsonify(quality.compute_quality(symbol))
     except Exception as e:
         return jsonify({"error": str(e)}), 502
 

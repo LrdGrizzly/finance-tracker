@@ -144,7 +144,26 @@ async function loadTicker(symbolRaw) {
       <strong>Caveats:</strong><br>${m.caveats.map((c) => "· " + c).join("<br>")}`;
   }).catch(() => { $("#monitor-signal").style.display = "none"; });
 
-  // Strategy Fit
+  // Quality-Compounder score (primary lens)
+  api(`/api/quality/${symbol}`).then((ql) => {
+    const card = $("#monitor-quality");
+    if (ql.score === null || ql.score === undefined) { card.style.display = "none"; return; }
+    card.style.display = "";
+    const el = $("#q-score");
+    el.textContent = `${ql.score}/100`;
+    el.style.color = ql.score >= 70 ? "var(--up)" : ql.score >= 45 ? "var(--cat-orange)" : "var(--down)";
+    $("#q-components").innerHTML = (ql.components || []).map((c) =>
+      `<div class="stat"><div class="caption">${c.name} · w${c.weight}</div><div class="v">${c.score}/100</div></div>`
+    ).join("");
+    $("#q-notes").innerHTML = (ql.notes || []).map((n) => `<li>${n}</li>`).join("");
+    const m = ql.methodology || {};
+    $("#q-method").innerHTML = `
+      <strong>ROIC formula:</strong> ${m.roic || ""}<br>
+      <strong>Source:</strong> ${m.source || ""} — years: ${(ql.yearsCovered || []).join(", ")}<br>
+      <strong>Caveats:</strong><br>${(m.caveats || []).map((c) => "· " + c).join("<br>")}`;
+  }).catch(() => { $("#monitor-quality").style.display = "none"; });
+
+  // Deep-Value score (parallel lens)
   api(`/api/fit/${symbol}`).then((fit) => {
     const card = $("#monitor-fit");
     if (fit.score === null || !fit.criteria.length) {
@@ -403,14 +422,25 @@ async function renderSuggestions() {
 }
 
 // ---------- Home ----------
-function renderHome(watchCount) {
-  api("/api/holdings").then((h) => {
-    $("#home-summary").innerHTML = `
-      <div class="stat"><div class="caption">Watchlist</div><div class="v">${watchCount ?? "…"} tickers</div></div>
-      <div class="stat"><div class="caption">Positions held</div><div class="v">${h.positions.length}</div></div>
-      <div class="stat"><div class="caption">FX rates</div><div class="v">${Object.keys(FX).length} currencies</div></div>
-      <div class="stat"><div class="caption">Data status</div><div class="v">see Maintenance</div></div>`;
-  });
+async function renderHome(watchCount) {
+  const h = await api("/api/holdings");
+  let vixCell = `<div class="stat"><div class="caption">VIX / VVIX</div><div class="v">…</div></div>`;
+  $("#home-summary").innerHTML = `
+    <div class="stat"><div class="caption">Watchlist</div><div class="v">${watchCount ?? "…"} tickers</div></div>
+    <div class="stat"><div class="caption">Positions held</div><div class="v">${h.positions.length}</div></div>
+    <div class="stat"><div class="caption">FX rates</div><div class="v">${Object.keys(FX).length} currencies</div></div>
+    <div class="stat" id="home-vix"><div class="caption">VIX / VVIX regime</div><div class="v">…</div></div>`;
+  try {
+    const [vix, vvix] = await Promise.all([api("/api/quote/^VIX"), api("/api/quote/^VVIX")]);
+    const v = vix.price, vv = vvix.price;
+    const regime = v == null ? "n/a" : v < 15 ? "calm" : v < 22 ? "normal" : v < 30 ? "elevated" : "stressed";
+    const color = { calm: "var(--up)", normal: "var(--text)", elevated: "var(--cat-orange)", stressed: "var(--down)" }[regime] || "var(--text)";
+    $("#home-vix").innerHTML = `
+      <div class="caption">VIX / VVIX regime</div>
+      <div class="v" style="color:${color}">${fmt(v, 1)} / ${fmt(vv, 1)} · ${regime}</div>
+      <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px;">
+        Volatility regime — position size scales inversely (rule #17)</div>`;
+  } catch (e) { /* index quote unavailable — leave placeholder */ }
 }
 
 // ---------- Maintenance ----------

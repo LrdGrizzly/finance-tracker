@@ -78,11 +78,26 @@
         <div id="sig-method" style="font-size:0.83rem; color:var(--text-muted); padding-top:8px;"></div>
       </details>
     </div>
+    <div class="card" id="monitor-quality" style="display:none;">
+      <div class="row" style="justify-content: space-between;">
+        <div>
+          <div class="caption">Quality-Compounder score — your primary lens</div>
+          <h2>Moat, ROIC, capital allocation</h2>
+        </div>
+        <div class="value-display" id="q-score"></div>
+      </div>
+      <div class="stat-grid" id="q-components"></div>
+      <ul id="q-notes" style="margin: 14px 0 0 18px; font-size: 0.85rem; color: var(--text-muted);"></ul>
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer; color:var(--text-muted); font-size:0.85rem;">Calculation transparency</summary>
+        <div id="q-method" style="font-size:0.83rem; color:var(--text-muted); padding-top:8px;"></div>
+      </details>
+    </div>
     <div class="card" id="monitor-fit" style="display:none;">
       <div class="row" style="justify-content: space-between;">
         <div>
-          <div class="caption">Strategy Fit — Selection layer</div>
-          <h2>How far does this skew from your strategy?</h2>
+          <div class="caption">Deep-Value score — parallel lens</div>
+          <h2>Graham / Magic Formula valuation check</h2>
         </div>
         <div class="value-display" id="fit-score"></div>
       </div>
