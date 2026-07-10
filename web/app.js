@@ -153,10 +153,19 @@ function tvWidget(container, symbol) {
     style: "1", locale: "en",
     hide_side_toolbar: false, allow_symbol_change: true,
     backgroundColor: "rgba(0,0,0,0)",
+    // MA Cross plots both MAs with distinct colors (two plain SMA studies
+    // get identical default styling in the embed — not distinguishable)
     studies: [
-      { id: "MASimple@tv-basicstudies", inputs: { length: 50 } },
-      { id: "MASimple@tv-basicstudies", inputs: { length: 200 } },
+      { id: "MACross@tv-basicstudies", inputs: { in_0: 50, in_1: 200 } },
     ],
+    studies_overrides: {
+      "compare.plot.color": "#2E7CF6",
+      "ma cross.short ma.color": "#2E7CF6",
+      "ma cross.long ma.color": "#E5484D",
+      "ma cross.short ma.linewidth": 2,
+      "ma cross.long ma.linewidth": 2,
+      "ma cross.crosses.visible": true,
+    },
   });
 }
 
@@ -660,13 +669,14 @@ async function loadHomeChart(symbol, label, period, interval) {
       borderUpColor: "#0FCA7A", borderDownColor: "#F75D5F",
       wickUpColor: "rgba(15,202,122,0.6)", wickDownColor: "rgba(247,93,95,0.6)",
     });
+    // public-analysis convention: 50MA blue, 200MA red
     homeMA50 = homeChart.addLineSeries({
-      color: "#C77D17", lineWidth: 1, priceLineVisible: false,
+      color: "#2E7CF6", lineWidth: 2, priceLineVisible: false,
       lastValueVisible: false, crosshairMarkerVisible: false,
       title: "SMA 50",
     });
     homeMA200 = homeChart.addLineSeries({
-      color: "#695CFB", lineWidth: 1, priceLineVisible: false,
+      color: "#E5484D", lineWidth: 2, priceLineVisible: false,
       lastValueVisible: false, crosshairMarkerVisible: false,
       title: "SMA 200",
     });
