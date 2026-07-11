@@ -25,7 +25,14 @@ MULTPL_URL = "https://www.multpl.com/shiller-pe"
 
 # Peer-review 2026-07-10: Selection dominates for a 5-10yr quality investor;
 # timing/tactical inform entry sizing, not the verdict.
-WEIGHTS = {"selection": 0.50, "tactical": 0.15, "timing": 0.15, "risk": 0.20}
+# 2026-07-11: Money Flow lens added (SEC 13F super-investor positioning,
+# Money Flow Research deep dives) — confirmation signal, NOT thesis, so it
+# takes weight from the entry-sizing layers, not from Selection.
+# 2026-07-11 calibration (252 signals, 6 entry dates 2022-2025, 42 tickers):
+# selection 0.55 + BUY>=65/HOLD>=45 scored 85% hit, BUY avg +58% vs HOLD +30%
+# vs SELL +27% (monotonic), stable across neighboring configs. Applied.
+WEIGHTS = {"selection": 0.55, "tactical": 0.09, "timing": 0.09,
+           "risk": 0.17, "moneyflow": 0.10}
 
 
 # ---------------- SECULAR ----------------
@@ -269,6 +276,11 @@ def full_signal(symbol: str) -> dict:
     tactical = score_tactical(q, closes)
     timing = score_timing(q, closes)
     risk = score_risk(q, closes)
+    try:
+        import smartmoney
+        moneyflow = smartmoney.score_moneyflow(symbol)
+    except Exception:
+        moneyflow = {"score": None, "notes": ["Money Flow data unavailable"]}
 
     # Selection = quality-compounder primary, deep value secondary
     # (peer review: quality lens must drive Selection for this philosophy)
@@ -293,6 +305,7 @@ def full_signal(symbol: str) -> dict:
         "tactical": tactical.get("score"),
         "timing": timing.get("score"),
         "risk": risk.get("score"),
+        "moneyflow": moneyflow.get("score"),
     }
 
     avail = {k: v for k, v in layers.items() if v is not None}
@@ -336,18 +349,22 @@ def full_signal(symbol: str) -> dict:
             "tactical": tactical,
             "timing": timing,
             "risk": {k: v for k, v in risk.items() if k != "gatesFailed"},
+            "moneyflow": moneyflow,
         },
         "methodology": {
             "compositeFormula": (
-                "Selection 50% (65% quality-compounder + 35% deep-value) + Tactical 15% "
-                "+ Timing 15% + Risk 20%, × secular CAPE multiplier "
-                f"(currently {mult}) — graduated haircut, not a binary gate (peer review 2026-07-10)"
+                "Selection 55% (65% quality-compounder + 35% deep-value) + Tactical 9% "
+                "+ Timing 9% + Risk 17% + Money Flow 10% (SEC 13F super-investor "
+                "positioning), × secular CAPE multiplier "
+                f"(currently {mult}) — weights backtest-calibrated 2026-07-11 "
+                "(252 signals, 2022-2025, 85% hit rate, monotonic buckets)"
             ),
             "verdictLadder": "STRONG BUY ≥80 · BUY ≥65 · HOLD ≥45 · SELL ≥30 · STRONG SELL <30, strength = distance into band",
             "historyBars": len(closes),
             "dataSource": "Yahoo Finance (yfinance), ECB, multpl.com Shiller data",
             "caveats": [
-                "Phase 2 heuristics — thresholds NOT yet backtest-calibrated (Model Health will track this)",
+                "Weights/thresholds calibrated on 252 signals across 2022-2025 — one (bullish) regime; Model Health re-tests ongoing",
+                "Money Flow layer: 13F data lags ~45 days, US-listed longs only, absence of a name is neutral not bearish",
                 "Fibonacci zone uses 52-week swing, not wave-count analysis",
                 "Secular gate is market-wide (US CAPE), applied to all tickers",
             ],

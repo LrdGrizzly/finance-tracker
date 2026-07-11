@@ -17,6 +17,7 @@ import fetcher
 import quality
 import screener
 import signals
+import smartmoney
 import strategy
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -140,6 +141,40 @@ def api_backtest_run():
 def api_backtest_latest():
     run = backtest.latest_run()
     return jsonify(run or {"empty": True})
+
+
+@app.post("/api/backtest/calibrate")
+def api_backtest_calibrate():
+    body = request.get_json(silent=True) or {}
+    try:
+        return jsonify(backtest.run_calibration(
+            tickers=body.get("tickers"),
+            entry_dates=body.get("entryDates"),
+        ))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.get("/api/backtest/calibration")
+def api_backtest_calibration():
+    run = backtest.latest_calibration()
+    return jsonify(run or {"empty": True})
+
+
+@app.get("/api/moneyflow")
+def api_moneyflow_overview():
+    try:
+        return jsonify(smartmoney.flows_overview())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.get("/api/moneyflow/<symbol>")
+def api_moneyflow_symbol(symbol):
+    try:
+        return jsonify(smartmoney.score_moneyflow(symbol))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
 
 
 @app.get("/api/search")

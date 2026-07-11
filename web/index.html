@@ -267,6 +267,13 @@
       <!-- ============ HEATMAPS ============ -->
       <section id="tab-heatmaps" class="tab-panel">
         <div class="panel">
+          <div class="panel-head"><h2>Super-investor money flow (SEC 13F)</h2></div>
+          <p class="sub" style="margin:0 0 12px">What six tracked managers actually did last quarter —
+            official EDGAR filings, ~45-day lag, US-listed longs only. Feeds the Money Flow layer (10%)
+            of every signal.</p>
+          <div id="mf-managers" class="stat-grid"></div>
+        </div>
+        <div class="panel">
           <div class="panel-head"><h2>Market Pulse</h2></div>
           <div class="placeholder">Phase 3 — sector treemap, cap-weight vs equal-weight concentration, breadth, choppiness, narrative.</div>
         </div>
@@ -296,6 +303,25 @@
           <div id="mh-empty" class="placeholder">No backtest run yet.</div>
           <details><summary>Method &amp; caveats</summary>
             <div id="mh-caveats" class="method"></div>
+          </details>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="caption">Calibration grid</div>
+              <h2>Weights &amp; thresholds — tested, not guessed</h2>
+              <p class="muted small" id="cal-meta"></p>
+            </div>
+          </div>
+          <table id="cal-table">
+            <thead><tr><th>Selection wt</th><th class="num">BUY ≥</th><th class="num">HOLD ≥</th>
+            <th class="num">Hit rate</th><th class="num">BUY n / avg</th><th class="num">HOLD n / avg</th>
+            <th class="num">SELL n / avg</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="cal-empty" class="placeholder">No calibration run yet — POST /api/backtest/calibrate (takes a few minutes).</div>
+          <details><summary>Method &amp; caveats</summary>
+            <div id="cal-caveats" class="method"></div>
           </details>
         </div>
       </section>

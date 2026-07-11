@@ -34,9 +34,28 @@ DEFAULT_TICKERS = [
     "WMT", "MSFT", "OR.PA", "CSCO", "SAN.PA", "CAT", "ABT",
     "ASML", "MA", "CRM", "GOOG", "ENEL.MI", "MARR.MI",
 ]
+# Calibration universe: Segreti Bancari + super-investor names from the
+# Money Flow Research deep dives + EU quality/value names for balance.
+EXTENDED_TICKERS = DEFAULT_TICKERS + [
+    "AAPL", "NVDA", "META", "AMZN", "GOOGL", "TSM", "AVGO", "AMAT", "LRCX",
+    "EQIX", "V", "QCOM", "MELI", "ISRG", "SPGI", "UNH", "LLY", "JPM",
+    "XOM", "LIN", "MC.PA", "AIR.PA", "TTE.PA", "SAP.DE", "SIE.DE", "ALV.DE",
+    "RACE.MI", "ISP.MI", "UCG.MI",
+]
 BENCHMARKS = ["SPY", "SWDA.MI"]
 
 CAPE_AT_ENTRY = 36.5  # Shiller data, mid-2025 (hardcoded; multpl serves current only)
+
+# Shiller CAPE at each calibration entry date (Shiller's published record,
+# rounded — multpl.com only serves the current value)
+CAPE_HISTORY = {
+    "2022-06-30": 29.0, "2022-12-30": 28.3,
+    "2023-06-30": 30.8, "2023-12-29": 32.6,
+    "2024-06-28": 35.0, "2024-12-31": 37.9,
+    "2025-06-30": 36.5,
+}
+CALIBRATION_DATES = ["2022-06-30", "2022-12-30", "2023-06-30",
+                     "2023-12-29", "2024-06-28", "2025-06-30"]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS backtest_runs (
@@ -62,6 +81,58 @@ def _bars_until(symbol, entry_date):
     return before, after
 
 
+_FUND_MEMO = {}
+
+
+def _fundamentals(symbol):
+    """Annual statement series for the PIT reconstruction, memoized per
+    process. yfinance gives ~4 recent fiscal years; for US names SEC EDGAR
+    extends the window to ~10y, which older entry dates need."""
+    if symbol in _FUND_MEMO:
+        return _FUND_MEMO[symbol]
+    out = None
+    try:
+        t = yf.Ticker(symbol)
+        fin, bal = t.financials, t.balance_sheet
+        if fin is not None and not fin.empty and bal is not None and not bal.empty:
+            out = {
+                "ebit": _row(fin, "EBIT", "Operating Income"),
+                "pretax": _row(fin, "Pretax Income"),
+                "tax": _row(fin, "Tax Provision"),
+                "net": _row(fin, "Net Income"),
+                "revenue": _row(fin, "Total Revenue"),
+                "gross": _row(fin, "Gross Profit"),
+                "equity": _row(bal, "Stockholders Equity",
+                               "Total Equity Gross Minority Interest"),
+                "debt": _row(bal, "Total Debt"),
+                "cash": _row(bal, "Cash And Cash Equivalents",
+                             "Cash Cash Equivalents And Short Term Investments"),
+                "shares": _row(bal, "Ordinary Shares Number", "Share Issued"),
+            }
+    except Exception:
+        out = None
+    # EDGAR depth for US names (extends 4y -> ~10y so 2022/2023 entries
+    # still have pre-entry statements)
+    if "." not in symbol:
+        try:
+            import edgar
+            hist = edgar.get_annual_history(symbol)
+            if hist and hist.get("series"):
+                s = hist["series"]
+                mapping = {"ebit": "ebit", "pretax": "pretax", "tax": "tax",
+                           "net": "netincome", "revenue": "revenue",
+                           "gross": "gross", "equity": "equity",
+                           "debt": "debt", "cash": "cash", "shares": "shares"}
+                out = out or {k: {} for k in mapping}
+                for local, remote in mapping.items():
+                    for y, v in (s.get(remote) or {}).items():
+                        out[local].setdefault(str(y)[:4], float(v) if v is not None else None)
+        except Exception:
+            pass
+    _FUND_MEMO[symbol] = out
+    return out
+
+
 def _point_in_time_quote(symbol, before, entry_year):
     """Synthetic quote dict as of entry, for the technical/risk layers."""
     closes = [r["close"] for r in before]
@@ -78,20 +149,11 @@ def _point_in_time_quote(symbol, before, entry_year):
 
     # statement-based fundamentals with fiscal years <= entry_year - 1
     try:
-        t = yf.Ticker(symbol)
-        fin, bal = t.financials, t.balance_sheet
-        if fin is not None and not fin.empty and bal is not None and not bal.empty:
-            ebit = _row(fin, "EBIT", "Operating Income")
-            pretax = _row(fin, "Pretax Income")
-            tax = _row(fin, "Tax Provision")
-            net = _row(fin, "Net Income")
-            revenue = _row(fin, "Total Revenue")
-            gross = _row(fin, "Gross Profit")
-            equity = _row(bal, "Stockholders Equity", "Total Equity Gross Minority Interest")
-            debt = _row(bal, "Total Debt")
-            cash = _row(bal, "Cash And Cash Equivalents",
-                        "Cash Cash Equivalents And Short Term Investments")
-            shares = _row(bal, "Ordinary Shares Number", "Share Issued")
+        f = _fundamentals(symbol)
+        if f:
+            ebit, pretax, tax, net = f["ebit"], f["pretax"], f["tax"], f["net"]
+            revenue, gross = f["revenue"], f["gross"]
+            equity, debt, cash, shares = f["equity"], f["debt"], f["cash"], f["shares"]
 
             years = sorted({y for y in equity if equity[y] is not None
                             and int(y) < int(entry_year)}, reverse=True)
@@ -163,58 +225,71 @@ def _verdict_hit(verdict, ret):
     return None
 
 
+def _eval_ticker(sym, entry_date, cape, horizon_bars=None):
+    """One (ticker, entry date) reconstruction. horizon_bars fixes the exit
+    N trading days after entry (calibration); None = latest close."""
+    before, after = _bars_until(sym, entry_date)
+    if len(before) < 60 or not after:
+        return None, "insufficient history around entry date"
+    entry_px = before[-1]["close"]
+    exit_bar = after[min(horizon_bars - 1, len(after) - 1)] if horizon_bars else after[-1]
+    exit_px = exit_bar["close"]
+    ret = round((exit_px / entry_px - 1) * 100, 2)
+
+    q = _point_in_time_quote(sym, before, entry_date[:4])
+    closes = [r["close"] for r in before]
+
+    tactical = signals.score_tactical(q, closes)
+    timing = signals.score_timing(q, closes)
+    risk = signals.score_risk(q, closes)
+
+    qs, dv = q.get("_qualityPIT"), q.get("_deepValuePIT")
+    if qs is not None and dv is not None:
+        selection = round(0.65 * qs + 0.35 * dv)
+    else:
+        selection = qs if qs is not None else dv
+
+    layers = {"selection": selection, "tactical": tactical.get("score"),
+              "timing": timing.get("score"), "risk": risk.get("score")}
+    if not any(v is not None for v in layers.values()):
+        return None, "no layer scores computable"
+    composite = _composite(layers, signals.WEIGHTS, cape)
+    verdict, _ = signals.verdict_ladder(composite)
+    return {
+        "symbol": sym,
+        "entryDate": before[-1]["date"],
+        "entryPrice": round(entry_px, 2),
+        "exitDate": exit_bar["date"],
+        "exitPrice": round(exit_px, 2),
+        "returnPct": ret,
+        "horizonPartial": bool(horizon_bars) and len(after) < horizon_bars,
+        "compositeAtEntry": composite,
+        "verdictAtEntry": verdict,
+        "layers": layers,
+        "hit": _verdict_hit(verdict, ret),
+    }, None
+
+
+def _composite(layers, weights, cape):
+    avail = {k: v for k, v in layers.items() if v is not None and k in weights}
+    if not avail:
+        return None
+    total_w = sum(weights[k] for k in avail)
+    raw = sum(v * weights[k] for k, v in avail.items()) / total_w
+    return round(raw * signals.secular_multiplier(cape))
+
+
 def run_backtest(tickers=None, entry_date="2025-06-30"):
     tickers = tickers or DEFAULT_TICKERS
-    entry_year = entry_date[:4]
     results, errors = [], []
-
     for sym in tickers:
         try:
-            before, after = _bars_until(sym, entry_date)
-            if len(before) < 60 or not after:
-                errors.append({"symbol": sym, "error": "insufficient history around entry date"})
-                continue
-            entry_px = before[-1]["close"]
-            exit_px = after[-1]["close"]
-            ret = round((exit_px / entry_px - 1) * 100, 2)
-
-            q = _point_in_time_quote(sym, before, entry_year)
-            closes = [r["close"] for r in before]
-
-            tactical = signals.score_tactical(q, closes)
-            timing = signals.score_timing(q, closes)
-            risk = signals.score_risk(q, closes)
-
-            qs, dv = q.get("_qualityPIT"), q.get("_deepValuePIT")
-            if qs is not None and dv is not None:
-                selection = round(0.65 * qs + 0.35 * dv)
+            rec, err = _eval_ticker(sym, entry_date,
+                                    CAPE_HISTORY.get(entry_date, CAPE_AT_ENTRY))
+            if rec:
+                results.append(rec)
             else:
-                selection = qs if qs is not None else dv
-
-            layers = {"selection": selection, "tactical": tactical.get("score"),
-                      "timing": timing.get("score"), "risk": risk.get("score")}
-            avail = {k: v for k, v in layers.items() if v is not None}
-            if not avail:
-                errors.append({"symbol": sym, "error": "no layer scores computable"})
-                continue
-            total_w = sum(signals.WEIGHTS[k] for k in avail)
-            raw = sum(v * signals.WEIGHTS[k] for k, v in avail.items()) / total_w
-            mult = signals.secular_multiplier(CAPE_AT_ENTRY)
-            composite = round(raw * mult)
-            verdict, strength = signals.verdict_ladder(composite)
-
-            results.append({
-                "symbol": sym,
-                "entryDate": before[-1]["date"],
-                "entryPrice": round(entry_px, 2),
-                "exitDate": after[-1]["date"],
-                "exitPrice": round(exit_px, 2),
-                "returnPct": ret,
-                "compositeAtEntry": composite,
-                "verdictAtEntry": verdict,
-                "layers": layers,
-                "hit": _verdict_hit(verdict, ret),
-            })
+                errors.append({"symbol": sym, "error": err})
         except Exception as e:
             errors.append({"symbol": sym, "error": str(e)})
 
@@ -254,7 +329,7 @@ def run_backtest(tickers=None, entry_date="2025-06-30"):
         "entryDate": entry_date,
         "runAt": time.time(),
         "runAtHuman": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "capeAtEntry": CAPE_AT_ENTRY,
+        "capeAtEntry": CAPE_HISTORY.get(entry_date, CAPE_AT_ENTRY),
         "results": sorted(results, key=lambda r: -r["returnPct"]),
         "benchmarks": benchmarks,
         "bucketStats": bucket_stats,
@@ -285,5 +360,147 @@ def latest_run():
     conn.executescript(SCHEMA)
     row = conn.execute(
         "SELECT payload FROM backtest_runs ORDER BY created_at DESC LIMIT 1").fetchone()
+    conn.close()
+    return json.loads(row["payload"]) if row else None
+
+
+# ---------------- calibration grid ----------------
+
+CAL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS calibration_runs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    payload     TEXT NOT NULL,
+    created_at  REAL NOT NULL
+);
+"""
+
+# candidate configs: selection weight (rest split pro-rata among
+# tactical/timing/risk at 25/25/50 of the remainder) × verdict thresholds
+_SEL_WEIGHTS = [0.45, 0.55, 0.65]
+_BUY_THRESHOLDS = [58, 62, 65, 70]
+_HOLD_FLOORS = [40, 45, 50]
+
+
+def _weights_for(sel):
+    rest = 1.0 - sel
+    return {"selection": sel, "tactical": rest * 0.25,
+            "timing": rest * 0.25, "risk": rest * 0.50}
+
+
+def run_calibration(tickers=None, entry_dates=None, horizon_bars=252):
+    """Multi-date, multi-ticker sweep. Reconstructs layer scores once per
+    (ticker, date), then grid-searches weights & verdict thresholds.
+    Reports — does NOT auto-apply. Money Flow layer excluded (no
+    point-in-time 13F reconstruction yet); composite renormalises without it,
+    same as live behaviour for non-covered names."""
+    tickers = tickers or EXTENDED_TICKERS
+    entry_dates = entry_dates or CALIBRATION_DATES
+    records, errors = [], []
+
+    for entry_date in entry_dates:
+        cape = CAPE_HISTORY.get(entry_date, CAPE_AT_ENTRY)
+        for sym in tickers:
+            try:
+                rec, err = _eval_ticker(sym, entry_date, cape, horizon_bars)
+                if rec:
+                    rec["cape"] = cape
+                    records.append(rec)
+                else:
+                    errors.append({"symbol": sym, "date": entry_date, "error": err})
+            except Exception as e:
+                errors.append({"symbol": sym, "date": entry_date, "error": str(e)})
+
+    def bucket(v, buy_t, hold_f):
+        if v is None:
+            return None
+        return "BUY" if v >= buy_t else ("HOLD" if v >= hold_f else "SELL")
+
+    def hit(b, ret):
+        if b == "BUY":
+            return ret > 0
+        if b == "HOLD":
+            return ret > -10
+        return ret < 0
+
+    configs = []
+    for sel in _SEL_WEIGHTS:
+        w = _weights_for(sel)
+        # composite per record for this weight set (thresholds don't affect it)
+        comps = [(_composite(r["layers"], w, r["cape"]), r["returnPct"])
+                 for r in records]
+        for buy_t in _BUY_THRESHOLDS:
+            for hold_f in _HOLD_FLOORS:
+                stats = {"BUY": [], "HOLD": [], "SELL": []}
+                hits = total = 0
+                for comp, ret in comps:
+                    b = bucket(comp, buy_t, hold_f)
+                    if b is None:
+                        continue
+                    stats[b].append(ret)
+                    total += 1
+                    hits += 1 if hit(b, ret) else 0
+                if not total:
+                    continue
+                avg = {k: (round(sum(v) / len(v), 2) if v else None)
+                       for k, v in stats.items()}
+                # monotonicity: BUY should out-return HOLD should out-return SELL
+                mono = (avg["BUY"] is not None and avg["SELL"] is not None
+                        and avg["BUY"] > (avg["HOLD"] or avg["BUY"] - 1)
+                        and (avg["HOLD"] or avg["SELL"] + 1) > avg["SELL"])
+                configs.append({
+                    "selectionWeight": sel, "buyThreshold": buy_t,
+                    "holdFloor": hold_f,
+                    "hitRate": round(100 * hits / total),
+                    "n": {k: len(v) for k, v in stats.items()},
+                    "avgReturn": avg,
+                    "buySellSpread": (round(avg["BUY"] - avg["SELL"], 2)
+                                      if avg["BUY"] is not None and avg["SELL"] is not None
+                                      else None),
+                    "monotonic": mono,
+                })
+
+    # rank: monotonic first, then hit rate, then spread — and require the
+    # BUY bucket to actually fire (>= 8 signals) to be considered actionable
+    def rank_key(c):
+        actionable = c["n"]["BUY"] >= 8
+        return (c["monotonic"], actionable, c["hitRate"], c["buySellSpread"] or -999)
+    configs.sort(key=rank_key, reverse=True)
+
+    current = {"selectionWeight": signals.WEIGHTS["selection"],
+               "buyThreshold": 65, "holdFloor": 45}
+
+    payload = {
+        "runAt": time.time(),
+        "runAtHuman": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "entryDates": entry_dates,
+        "horizonTradingDays": horizon_bars,
+        "signalsEvaluated": len(records),
+        "tickers": tickers,
+        "topConfigs": configs[:10],
+        "currentConfig": current,
+        "errors": errors[:20],
+        "errorCount": len(errors),
+        "caveats": [
+            f"{len(records)} signals across {len(entry_dates)} entry dates — indicative, not statistical proof",
+            "Money Flow layer excluded (no point-in-time 13F reconstruction yet)",
+            "Fixed 12-month horizon; last entry date is partially open",
+            "Results REPORTED only — thresholds are not auto-applied (overfit guard)",
+            "Selection reconstructed from pre-entry fiscal-year statements (EDGAR 10y for US, ~4y elsewhere)",
+        ],
+    }
+    conn = get_conn()
+    conn.executescript(CAL_SCHEMA)
+    conn.execute("INSERT INTO calibration_runs (payload, created_at) VALUES (?, ?)",
+                 (json.dumps(payload), time.time()))
+    conn.commit()
+    conn.close()
+    return payload
+
+
+def latest_calibration():
+    conn = get_conn()
+    conn.executescript(CAL_SCHEMA)
+    row = conn.execute(
+        "SELECT payload FROM calibration_runs ORDER BY created_at DESC LIMIT 1").fetchone()
     conn.close()
     return json.loads(row["payload"]) if row else None

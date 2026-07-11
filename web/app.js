@@ -842,6 +842,58 @@ function renderBacktest(bt) {
   $("#mh-caveats").innerHTML = (bt.caveats || []).map((c) => "· " + c).join("<br>");
 }
 
+// ---------- Calibration grid ----------
+function renderCalibration(cal) {
+  if (!cal || cal.empty) { $("#cal-empty").style.display = ""; return; }
+  $("#cal-empty").style.display = "none";
+  const cc = cal.currentConfig;
+  $("#cal-meta").textContent =
+    `${cal.signalsEvaluated} signals · entries ${cal.entryDates.join(", ")} · 12-month horizon · ` +
+    `applied config: selection ${cc.selectionWeight}, BUY ≥${cc.buyThreshold}, HOLD ≥${cc.holdFloor}`;
+  $("#cal-table tbody").innerHTML = (cal.topConfigs || []).map((c) => `
+    <tr>
+      <td>${c.selectionWeight}</td>
+      <td class="num">${c.buyThreshold}</td>
+      <td class="num">${c.holdFloor}</td>
+      <td class="num"><strong>${c.hitRate}%</strong></td>
+      <td class="num">${c.n.BUY} / ${c.avgReturn.BUY ?? "—"}%</td>
+      <td class="num">${c.n.HOLD} / ${c.avgReturn.HOLD ?? "—"}%</td>
+      <td class="num">${c.n.SELL} / ${c.avgReturn.SELL ?? "—"}%</td>
+    </tr>`).join("");
+  $("#cal-caveats").innerHTML = (cal.caveats || []).map((c) => "· " + c).join("<br>");
+}
+
+// ---------- Money Flow (super-investor 13F) ----------
+const ACTION_COLORS = { "new": "var(--up)", add: "var(--up)", reduce: "var(--down)", exit: "var(--down)" };
+const ACTION_LABELS = { "new": "NEW BUY", add: "ADD", reduce: "REDUCE", exit: "EXIT" };
+let mfLoaded = false;
+async function renderMoneyFlow() {
+  if (mfLoaded) return;
+  mfLoaded = true;
+  const el = $("#mf-managers");
+  el.innerHTML = '<div class="sub">Loading 13F filings from SEC EDGAR…</div>';
+  try {
+    const mf = await api("/api/moneyflow");
+    el.innerHTML = (mf.managers || []).map((m) => `
+      <div class="stat" style="text-align:left">
+        <div class="caption">${m.manager} · Q ending ${m.period}</div>
+        <div class="sub" style="margin-bottom:6px">${m.style}</div>
+        ${m.topMoves.map((mv) => `
+          <div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0">
+            <span><strong>${mv.ticker}</strong>${mv.putCall ? " (" + mv.putCall + ")" : ""}</span>
+            <span style="color:${ACTION_COLORS[mv.action]}">${ACTION_LABELS[mv.action]}</span>
+            <span class="sub">${mv.pctPortfolio}%</span>
+          </div>`).join("")}
+      </div>`).join("") || '<div class="sub">No 13F data available.</div>';
+  } catch (e) {
+    mfLoaded = false;
+    el.innerHTML = '<div class="sub">Money Flow fetch failed — retry by reopening this tab.</div>';
+  }
+}
+$$("#tabs button").forEach((b) => {
+  if (b.dataset.tab === "heatmaps") b.addEventListener("click", renderMoneyFlow);
+});
+
 $("#mh-run").addEventListener("click", async () => {
   $("#mh-run").textContent = "Running… (takes a minute)";
   $("#mh-run").disabled = true;
@@ -864,5 +916,6 @@ $("#mh-run").addEventListener("click", async () => {
   renderSuggestions().catch(() => {});
   pollScreen().catch(() => {});
   api("/api/backtest/latest").then(renderBacktest).catch(() => {});
+  api("/api/backtest/calibration").then(renderCalibration).catch(() => {});
   setInterval(() => { renderWatchlist(); renderPortfolio(); }, 5 * 60 * 1000);
 })();
